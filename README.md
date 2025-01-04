@@ -1,3 +1,6 @@
+
+![SWBF3](image.png)
+
 This installer was made for the Free Radical Archive discord for modding the Wii build of Star Wars Battlefront 3.
 https://discord.gg/VE6mDWru
 
