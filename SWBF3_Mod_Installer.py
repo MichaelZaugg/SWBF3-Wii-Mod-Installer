@@ -98,8 +98,6 @@ def start_install_process(mod_vars):
 
 
 # --------------------Mod Installation Functions------------------------
-import platform
-import subprocess
 
 def install_dynamic_input_textures():
     app_data = Path(GLOBAL_APPDATA_DIR) / "Load"
