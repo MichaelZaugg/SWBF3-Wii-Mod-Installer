@@ -1,0 +1,86 @@
+{
+    "mods": [
+      {
+        "name": "_faithful_hpbars_v2.0",
+        "version": "2.0",
+        "file": "_faithful_hpbars_v2.0.zip",
+        "size": "24KB",
+        "download_url": "https://mega.nz/file/CIAkCY7D#11Fnmsh9XWROy98CoMhzk_A-F3fomyE6OBbgW1lxyto"
+      },
+      {
+        "name": "4kTexturePacks",
+        "version": "4.0",
+        "file": "4kTexturePacks_v4.0.zip",
+        "size": "4.46GB",
+        "download_url": "https://mega.nz/file/TN5DHLqb#QWQdvuehR2dr7p13wM-rCWuK_mgLaB38aF_zXiQlwlI"
+      },
+      {
+        "name": "Battlefront_III_Cloth_Fix",
+        "version": "1.0",
+        "file": "Battlefront_III_Cloth_Fix_v1.0.zip",
+        "size": "702KB",
+        "download_url": "https://mega.nz/file/3RYmDICD#vpr2qPiQqls1WWCnYDcZtQaZChDEnnCwRcEn8SRUmnU"
+      },
+      {
+        "name": "characters",
+        "version": "1.0",
+        "file": "characters_v1.0.zip",
+        "size": "629MB",
+        "download_url": "https://mega.nz/file/3QRjGLKb#9B53gPGpBuFvfsv_H87XD_lg4lLkgau98sD9-IETQJE"
+      },
+      {
+        "name": "DynamicInputTextures",
+        "version": "1.0",
+        "file": "DynamicInputTextures_v1.0.zip",
+        "size": "189.1MB",
+        "download_url": "https://mega.nz/file/iVI3FaAY#nlVYwUdK0ba2AX89JPKOLHMFMVKSY-7yyvKwPa7pyH0"
+      },
+      {
+        "name": "EmbeddedResCompiler",
+        "version": "1.0",
+        "file": "EmbeddedResCompiler_v1.0.zip",
+        "size": "7.8MB",
+        "download_url": "https://mega.nz/file/jQhzBK4J#_Alz_9skiOndebvKGgX63pS_0u8HYWYpAZdjTgNuPbc"
+      },
+      {
+        "name": "ingame_models_x1_x2_new",
+        "version": "1.0",
+        "file": "ingame_models_x1_x2_new_v1.0.zip",
+        "size": "1.4MB",
+        "download_url": "https://mega.nz/file/iRg3TLJD#Tpj35D5KCkFbWT_L3X6-SbvjPbiX2KYPsVrFdB8NieA"
+      },
+      {
+        "name": "main",
+        "version": "1.0",
+        "file": "main_v1.0.zip",
+        "size": "3.2MB",
+        "download_url": "https://mega.nz/file/3IBxASDb#Ap9wGck4JLOeM0YQAMls-XLyXVINzDYHcvbjezrgEgM"
+      },
+      {
+        "name": "RABAZZ_dynamic",
+        "version": "1.0",
+        "file": "RABAZZ_dynamic_v1.0.zip",
+        "size": "67KB",
+        "download_url": "https://mega.nz/file/WJggXDwb#joDzY-4qQ1DvOuaeaPwthnCUgEbI8n1zDhPD1IFaY_Y"
+      },
+      {
+        "name": "SWBF3_Wii_Light_Fixes",
+        "version": "1.0",
+        "file": "SWBF3_Wii_Light_Fixes_v1.0.zip",
+        "size": "865KB",
+        "download_url": "https://mega.nz/file/OI4izRRb#sp5yXfz6NkYiNWEwtPeH2AuJiaOkizPioeV9uuDEqTg"
+      },
+      {
+        "name": "SWBF3_Wii_Muted_Blank_Sounds",
+        "version": "1.0",
+        "file": "SWBF3_Wii_Muted_Blank_Sounds_v1.0.zip",
+        "size": "5.6MB",
+        "download_url": "https://mega.nz/file/eMBnHADA#50qb6SXZiPTqCyPdSeGkKpGSbMN87AsCBWm_K1tB-CE"
+      }
+    ],
+    "installer": {
+      "version": "4.1",
+      "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/swbf3_wii_mod_installer_v4.1/SWBF3.Wii.Mod.Installer.exe"
+    }
+  }
+  
