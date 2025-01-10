@@ -1,6 +1,75 @@
 {
+  "mods": [
+    {
+      "name": "_faithful_hpbars_v2",
+      "version": "2.0",
+      "dir": "_faithful_hpbars_v2",
+      "download_url": ""
+    },
+    {
+      "name": "4kTexturePacks",
+      "version": "4.0",
+      "dir": "4kTexturePacks.zip",
+      "download_url": ""
+    },
+    {
+      "name": "Battlefront_III_Cloth_Fix",
+      "version": "1.0",
+      "dir": "Battlefront_III_Cloth_Fix",
+      "download_url": ""
+    },
+    {
+      "name": "characters",
+      "version": "1.0",
+      "dir": "characters",
+      "download_url": ""
+    },
+    {
+      "name": "DynamicInputTextures",
+      "version": "1.0",
+      "dir": "DynamicInputTextures",
+      "download_url": ""
+    },
+    {
+      "name": "EmbeddedResCompiler",
+      "version": "1.0",
+      "dir": "EmbeddedResCompiler",
+      "download_url": ""
+    },
+    {
+      "name": "ingame_models_x1_x2_new",
+      "version": "1.0",
+      "dir": "ingame_models_x1_x2_new",
+      "download_url": ""
+    },
+    {
+      "name": "main",
+      "version": "1.0",
+      "file": "main.dol",
+      "download_url": ""
+    },
+    {
+      "name": "RABAZZ_dynamic",
+      "version": "1.0",
+      "dir": "RABAZZ_dynamic",
+      "download_url": ""
+    },
+    {
+      "name": "SWBF3_Wii_Light_Fixes",
+      "version": "1.0",
+      "dir": "SWBF3_Wii_Light_Fixes",
+      "download_url": ""
+    },
+    {
+      "name": "SWBF3_Wii_Muted_Blank_Sounds",
+      "version": "1.0",
+      "dir": "SWBF3_Wii_Muted_Blank_Sounds",
+      "download_url": ""
+    }
+  ],
+
   "installer": {
-    "version": "4.3",
-    "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/swbf3_wii_mod_installer_v4.1/SWBF3_Wii_Mod_Installer_v4.3.exe"
+    "version": "4.2",
+    "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/swbf3_wii_mod_installer_v4.1/SWBF3.Wii.Mod.Installer.exe"
   }
 }
