@@ -65,6 +65,12 @@
       "version": "1.0",
       "dir": "SWBF3_Wii_Muted_Blank_Sounds",
       "download_url": ""
+    },
+    {
+      "name": "FixedMiniMaps",
+      "version": "1.0",
+      "dir": "minimaps",
+      "download_url": ""
     }
   ],
 
