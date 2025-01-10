@@ -12,6 +12,8 @@ import json
 import signal
 import time
 import platform
+import tempfile
+
 
 # Global flags and path variables
 TITLE = "SWBF3 Wii Mod Installer"
@@ -23,10 +25,11 @@ ICON_PATH = 'SWBF3Icon.ico'
 CONFIG_FILE = "mod_installer_config"
 
 #--------Update Manifest--------
-MANIFEST_URL = "https://raw.githubusercontent.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/main/manifest.json"
+MANIFEST_URL = "https://raw.githubusercontent.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/refs/heads/main/manifest.json"
+MOD_VERSIONS_URL = "https://raw.githubusercontent.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/refs/heads/main/mod_versions.json"
 loading_label = None
 stop_loading_flag = False
-current_version = "4.1"
+current_version = "4.5"
 
 # --------------------Loading Animation------------------------
 
@@ -146,13 +149,202 @@ def check_for_updates():
                 log_message("Installer updated. Exiting the current program...", "info")
                 root.after(0, root.destroy)
                 os.kill(os.getpid(), signal.SIGTERM)
-
+            else:
+                log_message("Checking for mod updates...", "info")
+                check_mod_versions()
         finally:
             stop_loading()
 
     start_loading()  # Start animation
     thread = threading.Thread(target=perform_update_sequence, daemon=True)
     thread.start()
+
+def check_mod_versions():
+    """
+    Checks if mod_versions.json exists. If not, downloads it.
+    Then checks the manifest for updates and updates mods if needed.
+    """
+    mod_versions_path = os.path.join(GLOBAL_MOD_DIR, "mod_versions.json")
+
+    try:
+        # Ensure mod_versions.json exists
+        if not os.path.exists(mod_versions_path):
+            log_message("mod_versions.json not found. Downloading the latest version...", "info")
+            response = requests.get(MOD_VERSIONS_URL, stream=True)
+            response.raise_for_status()
+            
+            with open(mod_versions_path, "wb") as file:
+                for chunk in response.iter_content(chunk_size=8192):
+                    file.write(chunk)
+            
+            log_message(f"mod_versions.json downloaded and saved to {mod_versions_path}.", "success")
+
+        # Load local mod versions
+        local_mod_versions = {}
+        with open(mod_versions_path, "r", encoding="utf-8") as file:
+            local_mod_versions = {mod["name"]: {"version": mod.get("version", "0.0"), "dir": mod.get("dir", mod["name"])} 
+                                  for mod in json.load(file).get("mods", [])}
+
+        # Fetch the manifest
+        manifest = fetch_manifest()
+        if not manifest:
+            log_message("Failed to fetch manifest.", "error")
+            return
+
+        # Track if any mods are updated
+        any_updates = False
+
+        # Check each mod in the manifest
+        for mod in manifest["mods"]:
+            mod_name = mod.get("name")
+            if not mod_name:
+                log_message("Manifest mod entry missing 'name'. Skipping.", "error")
+                continue
+
+            remote_version = mod.get("version", "0.0")
+            mod_dir = os.path.join(GLOBAL_MOD_DIR, mod.get("dir", mod_name))
+            download_url = mod.get("download_url")
+
+            # Retrieve local mod details
+            local_mod = local_mod_versions.get(mod_name, {"version": "0.0", "dir": mod_name})
+            local_version = local_mod["version"]
+
+            # Compare versions and update if needed
+            if remote_version > local_version:
+                log_message(f"New version of {mod_name} available: {remote_version} (local: {local_version}). Downloading...", "info")
+                if download_url:
+                    if update_mod(mod_dir, download_url, mod_name, remote_version, mod_versions_path):
+                        any_updates = True
+                else:
+                    log_message(f"No download URL provided for {mod_name}. Skipping update.", "warning")
+            else:
+                log_message(f"{mod_name} is up-to-date.", "success")
+
+        if not any_updates:
+            log_message("All mods are up-to-date. No changes made to mod_versions.json.", "info")
+
+    except requests.RequestException as e:
+        log_message(f"Failed to download mod_versions.json: {e}", "error")
+    except Exception as e:
+        log_message(f"Failed to check or update mod_versions.json: {e}", "error")
+
+
+
+
+def update_mod(mod_dir, download_url, mod_name, remote_version, mod_versions_path):
+    """
+    Downloads and extracts a mod archive, replacing existing files or adding new ones.
+    Special handling for main.dol to ensure it replaces the existing main.dol directly.
+    Updates the mod_versions.json file with the new version.
+    """
+    try:
+        # Ensure the mod directory exists
+        create_directory(mod_dir)
+
+        # Download the mod archive
+        log_message(f"Downloading files for {mod_name}...", "info")
+        response = requests.get(download_url, stream=True)
+        response.raise_for_status()
+
+        temp_zip_path = os.path.join(mod_dir, "temp_mod.zip")
+        with open(temp_zip_path, "wb") as temp_file:
+            for chunk in response.iter_content(chunk_size=8192):
+                temp_file.write(chunk)
+
+        # Extract the archive to a temporary directory
+        temp_extract_dir = tempfile.mkdtemp()
+        shutil.unpack_archive(temp_zip_path, temp_extract_dir)
+        os.remove(temp_zip_path)  # Clean up temporary zip file
+
+        # Special handling for main.dol
+        if mod_name == "main":
+            main_dol_path = os.path.join(temp_extract_dir, "main.dol")
+            if os.path.exists(main_dol_path):
+                dest_main_dol_path = os.path.join(GLOBAL_MOD_DIR, "main.dol")
+                shutil.copy2(main_dol_path, dest_main_dol_path)
+                log_message(f"main.dol replaced in {GLOBAL_MOD_DIR}.", "success")
+            else:
+                log_message("main.dol not found in the archive. Skipping.", "error")
+        else:
+            # General case for other mods
+            for item in os.listdir(temp_extract_dir):
+                src_path = os.path.join(temp_extract_dir, item)
+                dest_path = os.path.join(mod_dir, item)
+
+                if os.path.exists(dest_path):
+                    # If the file or directory exists, replace it
+                    if os.path.isdir(dest_path):
+                        shutil.rmtree(dest_path)  # Remove existing directory
+                    else:
+                        os.remove(dest_path)  # Remove existing file
+
+                if os.path.isdir(src_path):
+                    shutil.copytree(src_path, dest_path)  # Copy directories
+                else:
+                    shutil.copy2(src_path, dest_path)  # Copy files
+
+            log_message(f"Files for {mod_name} updated successfully.", "success")
+
+        # Clean up temporary extraction directory
+        shutil.rmtree(temp_extract_dir)
+
+        # Update mod_versions.json with the new version
+        if os.path.exists(mod_versions_path):
+            with open(mod_versions_path, "r", encoding="utf-8") as file:
+                data = json.load(file)
+        else:
+            data = {"mods": []}
+
+        # Find and update the specific mod
+        updated = False
+        for mod in data["mods"]:
+            if mod["name"] == mod_name:
+                mod["version"] = remote_version
+                updated = True
+                break
+
+        # If the mod is not found, add it to the list
+        if not updated:
+            data["mods"].append({"name": mod_name, "version": remote_version, "dir": os.path.basename(mod_dir)})
+
+        # Save the updated file
+        with open(mod_versions_path, "w", encoding="utf-8") as file:
+            json.dump(data, file, indent=4)
+
+        log_message(f"Updated version for {mod_name} in mod_versions.json to {remote_version}.", "success")
+        return True
+
+    except requests.RequestException as e:
+        log_message(f"Failed to download mod files from {download_url}: {e}", "error")
+    except Exception as e:
+        log_message(f"Error updating files or version for {mod_name} in {mod_dir}: {e}", "error")
+    finally:
+        # Ensure temporary directories are cleaned up
+        if os.path.exists(temp_zip_path):
+            os.remove(temp_zip_path)
+        if os.path.exists(temp_extract_dir):
+            shutil.rmtree(temp_extract_dir)
+    return False
+
+
+
+def download_mod_versions(mod_versions_path, url):
+    """
+    Downloads the mod_versions.json file from the given URL and saves it to the specified path.
+    Replaces the existing file if it already exists.
+    """
+    try:
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+
+        with open(mod_versions_path, "wb") as file:
+            for chunk in response.iter_content(chunk_size=8192):
+                file.write(chunk)
+
+        log_message(f"mod_versions.json downloaded and saved to {mod_versions_path}.", "success")
+    except requests.RequestException as e:
+        log_message(f"Failed to download mod_versions.json: {e}", "error")
+
 
 def resource_path(relative_path):
     try:
@@ -202,13 +394,17 @@ def copy_files(src, dest, overwrite=True):
         log_message(f"Failed to copy files from {src} to {dest}: {e}", "error")
 
 def start_install_process(mod_vars):
-    if check_install_conditions(mod_vars):
-        log_message("Starting installation process...", 'success')
-        start_loading()  # Start the loading animation
-        selected_mods = {mod: var for mod, var in mod_vars.items()}
-        threading.Thread(target=install_selected_mods, args=(selected_mods,), daemon=True).start()
-    else:
+    # Check installation conditions
+    if not check_install_conditions(mod_vars):
         log_message("Installation aborted due to errors.", 'error')
+        return  # Stop further execution if conditions are not met
+
+    # If all conditions are met, proceed with installation
+    log_message("Starting installation process...", 'success')
+    start_loading()  # Start the loading animation
+    selected_mods = {mod: var for mod, var in mod_vars.items() if var.get() == 1}  # Only include selected mods
+    threading.Thread(target=install_selected_mods, args=(selected_mods,), daemon=True).start()
+
 
 
 
@@ -660,14 +856,17 @@ def toggle_mods(mod_vars, toggle_btn):
 def setup_ui(root):
     root.grid_columnconfigure(1, weight=1)
     setup_console_ui(root)
-    setup_top_buttons(root)
+    mod_vars = setup_mod_ui(root)  # Capture mod_vars from setup_mod_ui
+    setup_top_buttons(root, mod_vars)  # Pass mod_vars to setup_top_buttons
     setup_directory_ui(root)
-    setup_mod_ui(root)
-    apply_dark_theme(root)
+    apply_dark_theme(root)  # Apply dark theme to all widgets after setup
+    return mod_vars
 
-def setup_top_buttons(root):
+def setup_top_buttons(root, mod_vars):
     # About button
-    Button(root, text="About", command=show_about).grid(row=0, column=0, sticky='w', padx=5, pady=5)
+    about_button = Button(root, text="About", command=show_about)
+    about_button.grid(row=0, column=0, sticky='w', padx=5, pady=5)
+    about_button.configure(bg="#2b2b2b", fg="white", activebackground="#3c3f41", activeforeground="white")
 
     # Load the image and display it
     try:
@@ -678,8 +877,19 @@ def setup_top_buttons(root):
         print(f"Error loading image: {e}")
         Label(root, text="Image Not Available", bg="#2b2b2b", fg="white").grid(row=0, column=1, sticky='w', padx=5, pady=5)
 
-    # Check for Updates button near the console
-    Button(root, text="Check for Updates", command=check_for_updates).grid(row=4, column=3, sticky='w', padx=10, pady=10)
+    # New Install button
+    install_button = Button(root, text="Install", command=lambda: start_install_process(mod_vars))
+    install_button.grid(row=4, column=2, sticky='w', padx=10, pady=10)
+    install_button.configure(bg="#2b2b2b", fg="white", activebackground="#3c3f41", activeforeground="white")
+
+    # Check for Updates button
+    updates_button = Button(root, text="Check for Updates", command=check_for_updates)
+    updates_button.grid(row=4, column=3, sticky='w', padx=10, pady=10)
+    updates_button.configure(bg="#2b2b2b", fg="white", activebackground="#3c3f41", activeforeground="white")
+
+
+
+
 
 def setup_directory_ui(root):
     Label(root, text="Game Directory:").grid(row=1, column=0, sticky='w', padx=5)
@@ -724,11 +934,13 @@ def setup_mod_ui(root):
     toggle_btn = Button(mods_frame, text="Select All Mods", command=lambda: toggle_mods(mod_vars, toggle_btn))
     toggle_btn.grid(row=len(MODS) + 1, column=0, sticky='w', padx=5, pady=2)
 
-    # Add the new label for enabling custom textures
     Label(root, text="Enable custom textures in Dolphin", bg="#2b2b2b", fg="white").grid(row=5, column=0, columnspan=3, sticky='ew', padx=5, pady=2)
 
     install_button = Button(root, text="Install", command=lambda: start_install_process(mod_vars))
     install_button.grid(row=6, column=0, columnspan=3, sticky='ew', padx=5, pady=5)
+
+    return mod_vars
+
 
 
 def setup_console_ui(root):
@@ -801,12 +1013,16 @@ def main_menu():
     root = tk.Tk()
     root.title(TITLE)
 
+    root.geometry("1530x725")
+    root.minsize(1530, 725)
+
     try:
         root.iconbitmap(resource_path(ICON_PATH))
     except Exception as e:
         print("Error setting ICO icon:", e)
 
-    setup_ui(root)
+    mod_vars = setup_ui(root)  # Get mod_vars from setup_ui
+    setup_top_buttons(root, mod_vars)  # Pass mod_vars to setup_top_buttons
     root.mainloop()
 
 
