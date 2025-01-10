@@ -4,7 +4,7 @@
       "name": "_faithful_hpbars_v2",
       "version": "2.0",
       "dir": "_faithful_hpbars_v2",
-      "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/raw/refs/heads/main/_faithful_hpbars_v2.zip"
+      "download_url": ""
     },
     {
       "name": "4kTexturePacks",
@@ -22,7 +22,7 @@
       "name": "characters",
       "version": "1.0",
       "dir": "characters",
-      "download_url": ""
+      "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/mod_update_v1/characters.zip"
     },
     {
       "name": "DynamicInputTextures",
