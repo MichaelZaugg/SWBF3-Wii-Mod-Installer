@@ -16,7 +16,8 @@ import tempfile
 
 
 # Global flags and path variables
-TITLE = "SWBF3 Wii Mod Installer"
+current_version = "4.6"
+TITLE = f"SWBF3 Wii Mod Installer v{current_version}"
 GLOBAL_GAME_DIR = ""
 GLOBAL_APPDATA_DIR = ""
 GLOBAL_CUSTOM_APPDATA = False
@@ -29,7 +30,6 @@ MANIFEST_URL = "https://raw.githubusercontent.com/MichaelZaugg/SWBF3-Wii-Mod-Ins
 MOD_VERSIONS_URL = "https://raw.githubusercontent.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/refs/heads/main/mod_versions.json"
 loading_label = None
 stop_loading_flag = False
-current_version = "4.5"
 
 # --------------------Loading Animation------------------------
 
@@ -569,7 +569,12 @@ def install_faithful_health_bars():
     create_directory(app_data_textures_dir)
     copy_files(mod_dir, app_data_textures_dir)
 
+def install_minimap_fix():
+    mod_dir = Path(GLOBAL_MOD_DIR) / "minimaps" / "minimaps"
+    app_data_textures_dir = Path(GLOBAL_APPDATA_DIR) / "Load" / "Textures" / "RABAZZ" / "minimaps"
 
+    create_directory(app_data_textures_dir)
+    copy_files(mod_dir, app_data_textures_dir)
 
 
 # Map mod names to their installation functions
@@ -582,6 +587,7 @@ MODS = {
     "4k Characters/Model Fix": install_4k_characters_model_fix,
     "Texture Pack: Faithful Health Bars": install_faithful_health_bars,
     "Dynamic Input Textures": install_dynamic_input_textures,
+    "Minimaps Fix (For r904, Enable prefetch custom textures)": install_minimap_fix,
 }
 
 
