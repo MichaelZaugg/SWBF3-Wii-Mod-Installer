@@ -16,7 +16,7 @@ import tempfile
 
 
 # Global flags and path variables
-current_version = "4.6"
+current_version = "4.7"
 TITLE = f"SWBF3 Wii Mod Installer v{current_version}"
 GLOBAL_GAME_DIR = ""
 GLOBAL_APPDATA_DIR = ""
@@ -40,6 +40,7 @@ def show_loading_animation():
     """
     spinner = itertools.cycle(["|", "/", "-", "\\"])  # Spinner characters
     global loading_label, stop_loading_flag
+
     if not loading_label:
         loading_label = Label(root, text="", bg="#2b2b2b", fg="white")
         loading_label.grid(row=7, column=0, columnspan=3, sticky='ew', padx=5, pady=5)
@@ -58,17 +59,16 @@ def start_loading():
     Start the spinner animation.
     """
     global stop_loading_flag
-    if stop_loading_flag:  # If spinner isn't running
-        stop_loading_flag = False
-        show_loading_animation()
+    stop_loading_flag = False
+    show_loading_animation()
 
 def stop_loading():
     """
     Stop the spinner animation.
     """
     global stop_loading_flag
-    if not stop_loading_flag:  # If spinner is running
-        stop_loading_flag = True
+    stop_loading_flag = True
+
 
 
 
@@ -394,16 +394,19 @@ def copy_files(src, dest, overwrite=True):
         log_message(f"Failed to copy files from {src} to {dest}: {e}", "error")
 
 def start_install_process(mod_vars):
-    # Check installation conditions
+    """
+    Start the installation process in a separate thread with loading animation.
+    """
     if not check_install_conditions(mod_vars):
         log_message("Installation aborted due to errors.", 'error')
-        return  # Stop further execution if conditions are not met
+        return
 
-    # If all conditions are met, proceed with installation
     log_message("Starting installation process...", 'success')
-    start_loading()  # Start the loading animation
-    selected_mods = {mod: var for mod, var in mod_vars.items() if var.get() == 1}  # Only include selected mods
+    
+    # Start a new thread for mod installation
+    selected_mods = {mod: var for mod, var in mod_vars.items() if var.get() == 1}
     threading.Thread(target=install_selected_mods, args=(selected_mods,), daemon=True).start()
+
 
 
 
@@ -722,9 +725,31 @@ def initialize_directories(game_dir_entry=None, mod_dir_entry=None, appdata_entr
         search_dolphin_emulator(appdata_entry)
 
 
-
-
 def browse_folder(entry_widget, update_global):
+    def find_mod_versions_folder(base_path, max_depth=3):
+        """
+        Searches for a folder containing 'mod_versions.json' within a specified depth.
+        :param base_path: The root directory to start searching from.
+        :param max_depth: The maximum depth to search.
+        :return: The path to the folder containing 'mod_versions.json', or None if not found.
+        """
+        def search_folder(current_path, current_depth):
+            if current_depth > max_depth:
+                return None
+            # Check if 'mod_versions.json' exists in the current folder
+            if "mod_versions.json" in os.listdir(current_path):
+                return current_path
+            # Recur into subdirectories
+            for entry in os.listdir(current_path):
+                entry_path = os.path.join(current_path, entry)
+                if os.path.isdir(entry_path):
+                    result = search_folder(entry_path, current_depth + 1)
+                    if result:
+                        return result
+            return None
+
+        return search_folder(base_path, 1)
+
     folder_selected = filedialog.askdirectory().replace('/', '\\')
     if folder_selected:
         if update_global == "game":
@@ -743,17 +768,19 @@ def browse_folder(entry_widget, update_global):
                 GLOBAL_GAME_DIR = ""
 
         elif update_global == "mod":
-            mods_path = find_mods_folder(folder_selected)
-            if not mods_path:
-                mods_path = os.path.join(folder_selected, "Mods")
-                os.makedirs(mods_path, exist_ok=True)
-                print_to_console("No 'Mods' folder found. Created a new 'Mods' folder. Mods will need to be downloaded.", "error")
-
-            global GLOBAL_MOD_DIR
-            GLOBAL_MOD_DIR = mods_path
-            print_to_console(f"Mod directory set to: {GLOBAL_MOD_DIR}", 'directory')
-            entry_widget.delete(0, tk.END)
-            entry_widget.insert(0, GLOBAL_MOD_DIR)
+            # Search for the folder containing 'mod_versions.json' up to 3 levels deep
+            mods_path = find_mod_versions_folder(folder_selected, max_depth=3)
+            if mods_path:
+                global GLOBAL_MOD_DIR
+                GLOBAL_MOD_DIR = mods_path
+                print_to_console(f"Mod directory set to: {GLOBAL_MOD_DIR}", 'directory')
+                entry_widget.delete(0, tk.END)
+                entry_widget.insert(0, GLOBAL_MOD_DIR)
+            else:
+                print_to_console("No 'mod_versions.json' found within 3 levels. Please check for updates or select the exctrated Mods.zip", 'error')
+                GLOBAL_MOD_DIR = ""
+                entry_widget.delete(0, tk.END)
+                entry_widget.insert(0, GLOBAL_MOD_DIR)
             save_config()
 
         elif update_global == "appdata":
@@ -992,11 +1019,17 @@ def check_install_conditions(mod_vars):
     return not errors
 
 def install_selected_mods(selected_mods):
+    """
+    Install the selected mods with a loading animation.
+    """
     try:
         mods_to_install = [mod for mod, is_selected in selected_mods.items() if is_selected.get()]
         if not mods_to_install:
             log_message("No mods selected for installation.", 'error')
             return
+
+        # Start the loading animation
+        root.after(0, start_loading)
 
         for mod in mods_to_install:
             log_message(f"Installing: {mod}")
@@ -1013,14 +1046,15 @@ def install_selected_mods(selected_mods):
 
 
 
+
 def main_menu():
     global root
     
     root = tk.Tk()
     root.title(TITLE)
 
-    root.geometry("1530x725")
-    root.minsize(1530, 725)
+    root.geometry("1530x735")
+    root.minsize(1530, 735)
 
     try:
         root.iconbitmap(resource_path(ICON_PATH))
