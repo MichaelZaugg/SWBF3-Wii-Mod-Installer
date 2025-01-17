@@ -16,7 +16,7 @@ import tempfile
 
 
 # Global flags and path variables
-current_version = "4.7"
+current_version = "4.8"
 TITLE = f"SWBF3 Wii Mod Installer v{current_version}"
 GLOBAL_GAME_DIR = ""
 GLOBAL_APPDATA_DIR = ""
@@ -579,6 +579,28 @@ def install_minimap_fix():
     create_directory(app_data_textures_dir)
     copy_files(mod_dir, app_data_textures_dir)
 
+def install_pc_xbox_features():
+    mod_dir = Path(GLOBAL_MOD_DIR) / "frontend_preview"
+    game_data_dir = Path(GLOBAL_GAME_DIR) / "DATA" / "files"
+
+    copy_files(mod_dir, game_data_dir / "data" / "bf" / "menus")
+
+    compile_script_path = game_data_dir / "compile_all_res.bat"
+    if compile_script_path.exists():
+        log_message("Compiling resources...", "info")
+        try:
+            subprocess.run(
+                str(compile_script_path),
+                shell=True,
+                check=True,
+                text=True,
+                cwd=str(game_data_dir)
+            )
+            log_message("Resource compilation complete.", "success")
+        except subprocess.CalledProcessError as e:
+            log_message(f"Error during resource compilation: {e}", "error")
+
+
 
 # Map mod names to their installation functions
 MODS = {
@@ -591,6 +613,7 @@ MODS = {
     "Texture Pack: Faithful Health Bars": install_faithful_health_bars,
     "Dynamic Input Textures": install_dynamic_input_textures,
     "Minimaps Fix (For r904, Enable prefetch custom textures)": install_minimap_fix,
+    "Unlocked PC/Xbox 360 Features in Frontend": install_pc_xbox_features,
 }
 
 
