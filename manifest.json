@@ -83,11 +83,16 @@
       "version": "1.0",
       "dir": "Music_and_Clone_VO",
       "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/mod_update_v1/Music_and_Clone_VO.zip"
-    }
+    },
+    {
+      "name": "Restored_r7_Vehicles",
+      "version": "1.0",
+      "dir": "restored_r7_vehicles",
+      "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/mod_update_v1/restored_r7_vehicles.zip"
   ],
 
   "installer": {
-    "version": "4.9",
-    "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/swbf3_wii_mod_installer_v4.1/SWBF3_Wii_Mod_Installer_v4.9.exe"
+    "version": "4.91",
+    "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/swbf3_wii_mod_installer_v4.1/SWBF3_Wii_Mod_Installer_v4.91.exe"
   }
 }
