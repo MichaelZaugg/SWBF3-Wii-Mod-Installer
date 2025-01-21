@@ -16,7 +16,7 @@ import tempfile
 
 
 # Global flags and path variables
-current_version = "4.91"
+current_version = "4.92"
 TITLE = f"SWBF3 Wii Mod Installer v{current_version}"
 GLOBAL_GAME_DIR = ""
 GLOBAL_APPDATA_DIR = ""
@@ -643,6 +643,21 @@ def install_restored_r7_vehicles():
     game_data_dir = Path(GLOBAL_GAME_DIR) / "DATA"
 
     copy_files(mod_dir, game_data_dir)
+
+    compile_script_path = game_data_dir / "DATA" / "files" / "compile_templates_and_res.bat"
+    if compile_script_path.exists():
+        log_message("Compiling resources...", "info")
+        try:
+            subprocess.run(
+                str(compile_script_path),
+                shell=True,
+                check=True,
+                text=True,
+                cwd=str(compile_script_path.parent),  # Set working directory to the .bat file's folder
+            )
+            log_message("Resource compilation complete.", "success")
+        except subprocess.CalledProcessError as e:
+            log_message(f"Error during resource compilation: {e}", "error")
 
 
 
