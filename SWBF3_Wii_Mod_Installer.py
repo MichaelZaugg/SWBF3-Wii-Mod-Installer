@@ -16,7 +16,7 @@ import tempfile
 
 
 # Global flags and path variables
-current_version = "4.9"
+current_version = "4.91"
 TITLE = f"SWBF3 Wii Mod Installer v{current_version}"
 GLOBAL_GAME_DIR = ""
 GLOBAL_APPDATA_DIR = ""
@@ -638,6 +638,12 @@ def install_music_clonetrooper_vo():
         except subprocess.CalledProcessError as e:
             log_message(f"Error during resource compilation: {e}", "error")
 
+def install_restored_r7_vehicles():
+    mod_dir = Path(GLOBAL_MOD_DIR) / "restored_r7_vehicles"
+    game_data_dir = Path(GLOBAL_GAME_DIR) / "DATA"
+
+    copy_files(mod_dir, game_data_dir)
+
 
 
 # Map mod names to their installation functions
@@ -653,6 +659,7 @@ MODS = {
     "Minimaps Fix (For r904, Enable prefetch custom textures)": install_minimap_fix,
     "Unlocked PC/Xbox 360 Features in Frontend": install_pc_xbox_features,
     "Music for all maps/modes-Fixed Clonetrooper VO": install_music_clonetrooper_vo,
+    "Restored r7 Vehicles": install_restored_r7_vehicles
 }
 
 
