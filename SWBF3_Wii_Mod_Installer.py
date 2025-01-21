@@ -16,7 +16,7 @@ import tempfile
 
 
 # Global flags and path variables
-current_version = "4.8"
+current_version = "4.9"
 TITLE = f"SWBF3 Wii Mod Installer v{current_version}"
 GLOBAL_GAME_DIR = ""
 GLOBAL_APPDATA_DIR = ""
@@ -230,12 +230,10 @@ def check_mod_versions():
 
 
 
-
 def update_mod(mod_dir, download_url, mod_name, remote_version, mod_versions_path):
     """
-    Downloads and extracts a mod archive, replacing existing files or adding new ones.
-    Special handling for main.dol to ensure it replaces the existing main.dol directly.
-    Updates the mod_versions.json file with the new version.
+    Downloads and extracts a mod archive, ensuring no duplicate folder structures are created.
+    Handles cases where the extracted folder has no nested folders or only one.
     """
     try:
         # Ensure the mod directory exists
@@ -256,34 +254,51 @@ def update_mod(mod_dir, download_url, mod_name, remote_version, mod_versions_pat
         shutil.unpack_archive(temp_zip_path, temp_extract_dir)
         os.remove(temp_zip_path)  # Clean up temporary zip file
 
-        # Special handling for main.dol
-        if mod_name == "main":
-            main_dol_path = os.path.join(temp_extract_dir, "main.dol")
-            if os.path.exists(main_dol_path):
-                dest_main_dol_path = os.path.join(GLOBAL_MOD_DIR, "main.dol")
-                shutil.copy2(main_dol_path, dest_main_dol_path)
-                log_message(f"main.dol replaced in {GLOBAL_MOD_DIR}.", "success")
+        # Check the extracted content
+        extracted_contents = os.listdir(temp_extract_dir)
+
+        # If there's only one folder and its name matches the mod_dir folder name, move its contents
+        if len(extracted_contents) == 1 and os.path.isdir(os.path.join(temp_extract_dir, extracted_contents[0])):
+            single_folder_path = os.path.join(temp_extract_dir, extracted_contents[0])
+            if os.path.basename(single_folder_path).lower() == os.path.basename(mod_dir).lower():
+                # Move the contents of the single folder directly to mod_dir
+                for item in os.listdir(single_folder_path):
+                    src_path = os.path.join(single_folder_path, item)
+                    dest_path = os.path.join(mod_dir, item)
+
+                    if os.path.exists(dest_path):
+                        if os.path.isdir(dest_path):
+                            shutil.rmtree(dest_path)
+                        else:
+                            os.remove(dest_path)
+
+                    if os.path.isdir(src_path):
+                        shutil.copytree(src_path, dest_path)
+                    else:
+                        shutil.copy2(src_path, dest_path)
+
+                log_message("Removed unnecessary duplicate folder after extraction.", "info")
             else:
-                log_message("main.dol not found in the archive. Skipping.", "error")
+                # Otherwise, treat it as a regular single folder and copy it as-is
+                shutil.copytree(single_folder_path, mod_dir, dirs_exist_ok=True)
         else:
-            # General case for other mods
-            for item in os.listdir(temp_extract_dir):
+            # General case: copy all extracted content to mod_dir
+            for item in extracted_contents:
                 src_path = os.path.join(temp_extract_dir, item)
                 dest_path = os.path.join(mod_dir, item)
 
                 if os.path.exists(dest_path):
-                    # If the file or directory exists, replace it
                     if os.path.isdir(dest_path):
-                        shutil.rmtree(dest_path)  # Remove existing directory
+                        shutil.rmtree(dest_path)
                     else:
-                        os.remove(dest_path)  # Remove existing file
+                        os.remove(dest_path)
 
                 if os.path.isdir(src_path):
-                    shutil.copytree(src_path, dest_path)  # Copy directories
+                    shutil.copytree(src_path, dest_path)
                 else:
-                    shutil.copy2(src_path, dest_path)  # Copy files
+                    shutil.copy2(src_path, dest_path)
 
-            log_message(f"Files for {mod_name} updated successfully.", "success")
+        log_message(f"Files for {mod_name} updated successfully.", "success")
 
         # Clean up temporary extraction directory
         shutil.rmtree(temp_extract_dir)
@@ -325,6 +340,7 @@ def update_mod(mod_dir, download_url, mod_name, remote_version, mod_versions_pat
         if os.path.exists(temp_extract_dir):
             shutil.rmtree(temp_extract_dir)
     return False
+
 
 
 
@@ -600,6 +616,28 @@ def install_pc_xbox_features():
         except subprocess.CalledProcessError as e:
             log_message(f"Error during resource compilation: {e}", "error")
 
+def install_music_clonetrooper_vo():
+    mod_dir = Path(GLOBAL_MOD_DIR)
+    game_data_dir = Path(GLOBAL_GAME_DIR)
+
+    copy_files(mod_dir / "EmbeddedResCompiler", game_data_dir / "DATA" / "files")
+    copy_files(mod_dir / "Music_and_Clone_VO" / "Music_and_Clone_VO", game_data_dir)
+
+    compile_script_path = game_data_dir / "DATA" / "files" / "compile_templates_and_res.bat"
+    if compile_script_path.exists():
+        log_message("Compiling resources...", "info")
+        try:
+            subprocess.run(
+                str(compile_script_path),
+                shell=True,
+                check=True,
+                text=True,
+                cwd=str(compile_script_path.parent),  # Set working directory to the .bat file's folder
+            )
+            log_message("Resource compilation complete.", "success")
+        except subprocess.CalledProcessError as e:
+            log_message(f"Error during resource compilation: {e}", "error")
+
 
 
 # Map mod names to their installation functions
@@ -614,6 +652,7 @@ MODS = {
     "Dynamic Input Textures": install_dynamic_input_textures,
     "Minimaps Fix (For r904, Enable prefetch custom textures)": install_minimap_fix,
     "Unlocked PC/Xbox 360 Features in Frontend": install_pc_xbox_features,
+    "Music for all maps/modes-Fixed Clonetrooper VO": install_music_clonetrooper_vo,
 }
 
 
