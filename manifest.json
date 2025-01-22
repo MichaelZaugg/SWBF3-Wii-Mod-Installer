@@ -50,9 +50,9 @@
     },
     {
       "name": "RABAZZ_dynamic",
-      "version": "1.0",
+      "version": "1.2",
       "dir": "RABAZZ_dynamic",
-      "download_url": ""
+      "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/mod_update_v1/RABAZZ_dynamic.zip"
     },
     {
       "name": "SWBF3_Wii_Light_Fixes",
