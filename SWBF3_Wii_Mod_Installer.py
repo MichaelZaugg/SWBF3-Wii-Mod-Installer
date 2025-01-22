@@ -3,6 +3,7 @@ import sys
 import shutil
 import tkinter as tk
 from tkinter import filedialog, Label, Entry, Toplevel, Checkbutton, IntVar, Frame, Button, Text, PhotoImage
+import tkinter.messagebox as messagebox
 from pathlib import Path
 import itertools
 import threading
@@ -16,7 +17,7 @@ import tempfile
 
 
 # Global flags and path variables
-current_version = "4.92"
+current_version = "5.5"
 TITLE = f"SWBF3 Wii Mod Installer v{current_version}"
 GLOBAL_GAME_DIR = ""
 GLOBAL_APPDATA_DIR = ""
@@ -378,14 +379,20 @@ def log_message(message, level="info"):
     root.after(0, lambda: print_to_console(message, tag))  # Log to UI console
 
 
-def print_to_console(message, tag=None):
-    """Print messages to the console UI if available; otherwise, print to terminal."""
+def print_to_console(message, tag=None, end="\n"):
+    """
+    Print messages to the console UI with optional tags for styling.
+    """
     if 'console_text' in globals() and console_text is not None:
-        console_text.insert('end', message + '\n', tag)
+        if tag:
+            console_text.insert('end', message + end, tag)
+        else:
+            console_text.insert('end', message + end)
         console_text.see('end')
         console_text.update_idletasks()  # Force the UI to update immediately
     else:
-        print(f"[{tag or 'INFO'}] {message}")
+        print(message, end=end)  # Fallback to terminal logging
+
 
 
 def create_directory(path):
@@ -417,10 +424,21 @@ def start_install_process(mod_vars):
         log_message("Installation aborted due to errors.", 'error')
         return
 
-    log_message("Starting installation process...", 'success')
-    
-    # Start a new thread for mod installation
     selected_mods = {mod: var for mod, var in mod_vars.items() if var.get() == 1}
+
+    # Add confirmation for the music mod
+    if "Music for all maps/modes-Fixed Clonetrooper VO" in selected_mods:
+        confirm = messagebox.askyesno(
+            "Confirm Installation",
+            "The 'Music for all maps/modes-Fixed Clonetrooper VO' mod may override lighting changes and other mods. Do you want to continue?"
+        )
+        if not confirm:
+            log_message("User canceled installation of the music mod.", 'warning')
+            return
+
+    log_message("Starting installation process...", 'success')
+
+    # Start a new thread for mod installation
     threading.Thread(target=install_selected_mods, args=(selected_mods,), daemon=True).start()
 
 
@@ -644,7 +662,7 @@ def install_restored_r7_vehicles():
 
     copy_files(mod_dir, game_data_dir)
 
-    compile_script_path = game_data_dir / "DATA" / "files" / "compile_templates_and_res.bat"
+    compile_script_path = game_data_dir / "files" / "compile_templates_and_res.bat"
     if compile_script_path.exists():
         log_message("Compiling resources...", "info")
         try:
@@ -659,9 +677,6 @@ def install_restored_r7_vehicles():
         except subprocess.CalledProcessError as e:
             log_message(f"Error during resource compilation: {e}", "error")
 
-
-
-# Map mod names to their installation functions
 MODS = {
     "Muted Blank Audio": install_muted_blank_audio,
     "4k texture pack Part 1, 2, 3, 4": install_4k_texture_pack,
@@ -676,6 +691,23 @@ MODS = {
     "Music for all maps/modes-Fixed Clonetrooper VO": install_music_clonetrooper_vo,
     "Restored r7 Vehicles": install_restored_r7_vehicles
 }
+
+# Map mod names to their installation functions
+MODS_DIRECTORY = {
+    "Muted Blank Audio": lambda: os.path.join(GLOBAL_MOD_DIR, "SWBF3_Wii_Muted_Blank_Sounds"),
+    "4k texture pack Part 1, 2, 3, 4": lambda: os.path.join(GLOBAL_MOD_DIR, "4kTexturePacks"),
+    "Lighting Fix": lambda: os.path.join(GLOBAL_MOD_DIR, "SWBF3_Wii_Light_Fixes"),
+    "Updated Debug Menu (main.dol from Clonetrooper163)": lambda: os.path.join(GLOBAL_MOD_DIR, "Updated_Debug_Menu"),
+    "Cloth Fix": lambda: os.path.join(GLOBAL_MOD_DIR, "Battlefront_III_Cloth_Fix"),
+    "4k Characters/Model Fix": lambda: os.path.join(GLOBAL_MOD_DIR, "characters"),
+    "Texture Pack: Faithful Health Bars": lambda: os.path.join(GLOBAL_MOD_DIR, "_faithful_hpbars_v2"),
+    "Dynamic Input Textures": lambda: os.path.join(GLOBAL_MOD_DIR, "DynamicInputTextures"),
+    "Minimaps Fix (For r904, Enable prefetch custom textures)": lambda: os.path.join(GLOBAL_MOD_DIR, "Minimaps"),
+    "Unlocked PC/Xbox 360 Features in Frontend": lambda: os.path.join(GLOBAL_MOD_DIR, "frontend_preview"),
+    "Music for all maps/modes-Fixed Clonetrooper VO": lambda: os.path.join(GLOBAL_MOD_DIR, "Music_and_Clone_VO"),
+    "Restored r7 Vehicles": lambda: os.path.join(GLOBAL_MOD_DIR, "restored_r7_vehicles")
+}
+
 
 
 #-------Dark Theme and About-----------------
@@ -1058,8 +1090,6 @@ def setup_mod_ui(root):
 
     return mod_vars
 
-
-
 def setup_console_ui(root):
     console_frame = Frame(root, width=400, bg="#2b2b2b")
     console_frame.grid(row=0, column=4, rowspan=6, sticky='nsew', padx=5, pady=5)
@@ -1069,12 +1099,18 @@ def setup_console_ui(root):
     console_text.pack(expand=True, fill='both')
     Label(console_frame, text="Console Output:", fg="white", bg="#2b2b2b").pack(side='top', anchor='w')
 
-    console_text.tag_configure('directory', foreground='yellow')
+    # Configure tags for styled text
     console_text.tag_configure('error', foreground='red')
+    console_text.tag_configure('yellow', foreground='yellow')
     console_text.tag_configure('success', foreground='#32CD32')
+
 
 def check_install_conditions(mod_vars):
     errors = False
+    warnings = []
+    selected_mods = [mod for mod, var in mod_vars.items() if var.get() == 1]
+
+    # Check for game directory, mod directory, and appdata directory
     if not GLOBAL_GAME_DIR:
         print_to_console("No valid game directory selected.", 'error')
         errors = True
@@ -1087,45 +1123,153 @@ def check_install_conditions(mod_vars):
     elif GLOBAL_CUSTOM_APPDATA:
         print_to_console("Custom AppData directory accepted without further checks.", 'info')
     else:
-        if GLOBAL_APPDATA_DIR.endswith('Dolphin Emulator'):
-            expected_path = GLOBAL_APPDATA_DIR
-        else:
-            expected_path = os.path.join(GLOBAL_APPDATA_DIR, 'Dolphin Emulator')
-
+        expected_path = (GLOBAL_APPDATA_DIR if GLOBAL_APPDATA_DIR.endswith('Dolphin Emulator') 
+                         else os.path.join(GLOBAL_APPDATA_DIR, 'Dolphin Emulator'))
         if not os.path.exists(expected_path):
             print_to_console(f"Dolphin Emulator directory not found at {expected_path}.", 'error')
             errors = True
 
-    if not any(var.get() for var in mod_vars.values()):
+    if not selected_mods:
         print_to_console("No mods have been selected.", 'error')
         errors = True
 
+    # Check for incompatibilities
+    if "Music for all maps/modes-Fixed Clonetrooper VO" in selected_mods:
+        if "Lighting Fix" in selected_mods or "Restored r7 Vehicles" in selected_mods:
+            print_to_console("Error: 'Music for all maps/modes-Fixed Clonetrooper VO' is incompatible with 'Lighting Fix' and 'Restored r7 Vehicles'.", 'error')
+            #errors = True
+        else:
+            warnings.append("Warning: 'Music for all maps/modes-Fixed Clonetrooper VO' will override lighting changes.")
+
+    # Display warnings
+    for warning in warnings:
+        print_to_console(warning, 'warning')
+
     return not errors
+
+def load_mod_directories(mod_versions_path):
+    """
+    Load mod directories from mod_versions.json.
+
+    :param mod_versions_path: Path to the mod_versions.json file.
+    :return: Dictionary mapping mod names to their directories.
+    """
+    try:
+        with open(mod_versions_path, "r", encoding="utf-8") as file:
+            data = json.load(file)
+
+        # Use mod name as the directory if 'dir' is not specified
+        mod_dirs = {}
+        for mod in data.get("mods", []):
+            name = mod.get("name")
+            dir_path = mod.get("dir", name)  # Default to the mod name if 'dir' is missing
+            if not name or not dir_path:
+                log_message(f"Skipping invalid mod entry: {mod}", "warning")
+                continue
+            mod_dirs[name] = dir_path
+
+        return mod_dirs
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        log_message(f"Failed to load mod_versions.json: {e}", "error")
+        return {}
+
+
+
+def check_file_name_conflicts(selected_mods):
+    """
+    Check for file name conflicts among selected mods using their defined directories.
+
+    :param selected_mods: A dictionary of selected mods with their installation status.
+    :return: List of conflicting file names with the mods involved.
+    """
+    file_names = {}  # Dictionary to map file names to mods
+    conflicts = []  # List to store conflicting file entries
+
+    # Collect all file names from each selected mod
+    for mod, is_selected in selected_mods.items():
+        if is_selected.get():  # If the mod is selected
+            # Skip "Updated Debug Menu" mod
+            if mod == "Updated Debug Menu (main.dol from Clonetrooper163)":
+                continue
+
+            # Get the mod directory from MODS
+            mod_dir_function = MODS_DIRECTORY.get(mod)
+            if not mod_dir_function:
+                print_to_console(f"Mod directory not found for: {mod}", "error")
+                continue
+
+            mod_dir = mod_dir_function()  # Call the function to get the directory path
+            if os.path.exists(mod_dir):
+                for root, _, files in os.walk(mod_dir):
+                    for file in files:
+                        # Only process .res and .war files
+                        if file.endswith((".res", ".war")):
+                            normalized_file_name = file.lower()  # Normalize to handle case sensitivity
+                            if normalized_file_name in file_names:
+                                file_names[normalized_file_name].add(mod)  # Add mod to the set
+                            else:
+                                file_names[normalized_file_name] = {mod}  # Create a new set for the file name
+            else:
+                print_to_console(f"Mod directory does not exist: {mod_dir}", "error")
+
+    # Find conflicts
+    for file_name, mods in file_names.items():
+        if len(mods) > 1:  # If the same file is found in more than one mod
+            conflicts.append((file_name, list(mods)))  # Convert set to list for easier handling
+            # Use the "yellow" tag for the file name in the UI console
+            print_to_console(f"[ERROR] File: ", "error", end="")
+            print_to_console(file_name, "yellow", end="")
+            print_to_console(f" is present in mods: {', '.join(mods)}", "error")
+
+    return conflicts
+
+
+
 
 def install_selected_mods(selected_mods):
     """
-    Install the selected mods with a loading animation.
+    Install the selected mods after checking for file name conflicts.
+
+    :param selected_mods: A dictionary of selected mods with their installation status.
     """
     try:
-        mods_to_install = [mod for mod, is_selected in selected_mods.items() if is_selected.get()]
-        if not mods_to_install:
-            log_message("No mods selected for installation.", 'error')
+        # Start the loading animation
+        start_loading()
+
+        if not check_install_conditions(selected_mods):
+            log_message("Installation aborted due to errors.", "error")
             return
 
-        # Start the loading animation
-        root.after(0, start_loading)
+        # Check for file name conflicts
+        conflicts = check_file_name_conflicts(selected_mods)
+        if conflicts:
+            # Log conflicts and abort installation
+            #log_message("Conflicts detected among selected mods:", "error")
+            #for file_name, mods in conflicts:
+                #print_to_console(f"[ERROR] File: {file_name} is present in mods: {', '.join(mods)}", "error")
+            return  # Abort installation
 
+        log_message("No conflicts detected. Proceeding with installation...", "success")
+
+        # Install mods
+        mods_to_install = [mod for mod, is_selected in selected_mods.items() if is_selected.get()]
         for mod in mods_to_install:
-            log_message(f"Installing: {mod}")
+            log_message(f"Installing: {mod}", "info")
             try:
-                MODS[mod]()  # Call the corresponding installation function
-                log_message(f"{mod} installed successfully.", 'success')
+                mod_install_function = MODS.get(mod)
+                if mod_install_function:
+                    mod_install_function()  # Call the corresponding installation function
+                    log_message(f"{mod} installed successfully.", "success")
+                else:
+                    log_message(f"No installation function found for {mod}. Skipping...", "warning")
             except Exception as e:
-                log_message(f"Error installing {mod}: {e}", 'error')
+                log_message(f"Error installing {mod}: {e}", "error")
 
-        log_message("-----DONE-----", 'success')
+        log_message("-----Installation Complete-----", "success")
     finally:
-        root.after(0, stop_loading)  # Stop the loading animation after installation completes
+        # Stop the loading animation
+        stop_loading()
+
 
 
 
@@ -1137,8 +1281,8 @@ def main_menu():
     root = tk.Tk()
     root.title(TITLE)
 
-    root.geometry("1530x735")
-    root.minsize(1530, 735)
+    root.geometry("1530x740")
+    root.minsize(1530, 740)
 
     try:
         root.iconbitmap(resource_path(ICON_PATH))
