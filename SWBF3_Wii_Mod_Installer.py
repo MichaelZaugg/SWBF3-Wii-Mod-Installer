@@ -17,7 +17,7 @@ import tempfile
 
 
 # Global flags and path variables
-current_version = "5.5"
+current_version = "5.6"
 TITLE = f"SWBF3 Wii Mod Installer v{current_version}"
 GLOBAL_GAME_DIR = ""
 GLOBAL_APPDATA_DIR = ""
@@ -635,6 +635,7 @@ def install_pc_xbox_features():
             log_message(f"Error during resource compilation: {e}", "error")
 
 def install_music_clonetrooper_vo():
+    install_lighting_fix()
     mod_dir = Path(GLOBAL_MOD_DIR)
     game_data_dir = Path(GLOBAL_GAME_DIR)
 
@@ -1188,11 +1189,10 @@ def check_file_name_conflicts(selected_mods):
     # Collect all file names from each selected mod
     for mod, is_selected in selected_mods.items():
         if is_selected.get():  # If the mod is selected
-            # Skip "Updated Debug Menu" mod
+            # Get the mod directory from MODS
             if mod == "Updated Debug Menu (main.dol from Clonetrooper163)":
                 continue
 
-            # Get the mod directory from MODS
             mod_dir_function = MODS_DIRECTORY.get(mod)
             if not mod_dir_function:
                 print_to_console(f"Mod directory not found for: {mod}", "error")
@@ -1215,6 +1215,12 @@ def check_file_name_conflicts(selected_mods):
     # Find conflicts
     for file_name, mods in file_names.items():
         if len(mods) > 1:  # If the same file is found in more than one mod
+            if file_name == "invisible_hand.res" and {"Lighting Fix", "Music for all maps/modes-Fixed Clonetrooper VO"}.issubset(mods):
+                # Dismiss specific conflict
+                print_to_console(f"[ERROR] File: {file_name} is present in mods: {', '.join(mods)} (DISMISSED)", "info")
+                continue  # Skip adding this conflict to the conflicts list
+
+            # Log other conflicts as errors
             conflicts.append((file_name, list(mods)))  # Convert set to list for easier handling
             # Use the "yellow" tag for the file name in the UI console
             print_to_console(f"[ERROR] File: ", "error", end="")
