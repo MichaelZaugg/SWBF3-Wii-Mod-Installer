@@ -93,7 +93,7 @@
   ],
 
   "installer": {
-    "version": "5.6",
-    "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/swbf3_wii_mod_installer_v4.1/SWBF3_Wii_Mod_Installer_v5.6.exe"
+    "version": "5.7",
+    "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/swbf3_wii_mod_installer_v4.1/SWBF3_Wii_Mod_Installer_v5.7.exe"
   }
 }
