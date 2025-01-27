@@ -8,9 +8,9 @@
     },
     {
       "name": "4kTexturePacks",
-      "version": "4.0",
-      "dir": "4kTexturePacks.zip",
-      "download_url": ""
+      "version": "4.1",
+      "dir": "4kTexturePacks",
+      "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/mod_update_v1/4kTexturePacks.zip"
     },
     {
       "name": "Battlefront_III_Cloth_Fix",
