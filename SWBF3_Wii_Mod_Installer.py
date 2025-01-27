@@ -17,7 +17,7 @@ import tempfile
 
 
 # Global flags and path variables
-current_version = "5.6"
+current_version = "5.7"
 TITLE = f"SWBF3 Wii Mod Installer v{current_version}"
 GLOBAL_GAME_DIR = ""
 GLOBAL_APPDATA_DIR = ""
@@ -635,14 +635,13 @@ def install_pc_xbox_features():
             log_message(f"Error during resource compilation: {e}", "error")
 
 def install_music_clonetrooper_vo():
-    install_lighting_fix()
     mod_dir = Path(GLOBAL_MOD_DIR)
     game_data_dir = Path(GLOBAL_GAME_DIR)
+    game_data_compiler_dir = Path(GLOBAL_GAME_DIR) / "DATA" / "files"
 
-    copy_files(mod_dir / "EmbeddedResCompiler", game_data_dir / "DATA" / "files")
     copy_files(mod_dir / "Music_and_Clone_VO" / "Music_and_Clone_VO", game_data_dir)
 
-    compile_script_path = game_data_dir / "DATA" / "files" / "compile_templates_and_res.bat"
+    compile_script_path = game_data_compiler_dir / "compile_templates_and_res.bat"
     if compile_script_path.exists():
         log_message("Compiling resources...", "info")
         try:
@@ -680,7 +679,7 @@ def install_restored_r7_vehicles():
 
 MODS = {
     "Muted Blank Audio": install_muted_blank_audio,
-    "4k texture pack Part 1, 2, 3, 4": install_4k_texture_pack,
+    "4k texture pack Part 1, 2, 3, 4, 5": install_4k_texture_pack,
     "Lighting Fix": install_lighting_fix,
     "Updated Debug Menu (main.dol from Clonetrooper163)": install_updated_debug_menu,
     "Cloth Fix": install_cloth_fix,
@@ -696,7 +695,7 @@ MODS = {
 # Map mod names to their installation functions
 MODS_DIRECTORY = {
     "Muted Blank Audio": lambda: os.path.join(GLOBAL_MOD_DIR, "SWBF3_Wii_Muted_Blank_Sounds"),
-    "4k texture pack Part 1, 2, 3, 4": lambda: os.path.join(GLOBAL_MOD_DIR, "4kTexturePacks"),
+    "4k texture pack Part 1, 2, 3, 4, 5": lambda: os.path.join(GLOBAL_MOD_DIR, "4kTexturePacks"),
     "Lighting Fix": lambda: os.path.join(GLOBAL_MOD_DIR, "SWBF3_Wii_Light_Fixes"),
     "Updated Debug Menu (main.dol from Clonetrooper163)": lambda: os.path.join(GLOBAL_MOD_DIR, "Updated_Debug_Menu"),
     "Cloth Fix": lambda: os.path.join(GLOBAL_MOD_DIR, "Battlefront_III_Cloth_Fix"),
