@@ -17,7 +17,7 @@ import tempfile
 
 
 # Global flags and path variables
-current_version = "5.7"
+current_version = "5.8"
 TITLE = f"SWBF3 Wii Mod Installer v{current_version}"
 GLOBAL_GAME_DIR = ""
 GLOBAL_APPDATA_DIR = ""
@@ -677,6 +677,27 @@ def install_restored_r7_vehicles():
         except subprocess.CalledProcessError as e:
             log_message(f"Error during resource compilation: {e}", "error")
 
+def install_restored_melee_classes():
+    mod_dir = Path(GLOBAL_MOD_DIR) / "RestoredMeleeClasses"
+    game_data_dir = Path(GLOBAL_GAME_DIR) / "DATA"
+
+    copy_files(mod_dir, game_data_dir)
+
+    compile_script_path = game_data_dir / "files" / "compile_templates_and_res.bat"
+    if compile_script_path.exists():
+        log_message("Compiling resources...", "info")
+        try:
+            subprocess.run(
+                str(compile_script_path),
+                shell=True,
+                check=True,
+                text=True,
+                cwd=str(compile_script_path.parent),  # Set working directory to the .bat file's folder
+            )
+            log_message("Resource compilation complete.", "success")
+        except subprocess.CalledProcessError as e:
+            log_message(f"Error during resource compilation: {e}", "error")
+
 MODS = {
     "Muted Blank Audio": install_muted_blank_audio,
     "4k texture pack Part 1, 2, 3, 4, 5": install_4k_texture_pack,
@@ -689,7 +710,8 @@ MODS = {
     "Minimaps Fix (For r904, Enable prefetch custom textures)": install_minimap_fix,
     "Unlocked PC/Xbox 360 Features in Frontend": install_pc_xbox_features,
     "Music for all maps/modes-Fixed Clonetrooper VO": install_music_clonetrooper_vo,
-    "Restored r7 Vehicles": install_restored_r7_vehicles
+    "Restored r7 Vehicles": install_restored_r7_vehicles,
+    "r9 Restored Melee Classes": install_restored_melee_classes
 }
 
 # Map mod names to their installation functions
@@ -705,7 +727,8 @@ MODS_DIRECTORY = {
     "Minimaps Fix (For r904, Enable prefetch custom textures)": lambda: os.path.join(GLOBAL_MOD_DIR, "Minimaps"),
     "Unlocked PC/Xbox 360 Features in Frontend": lambda: os.path.join(GLOBAL_MOD_DIR, "frontend_preview"),
     "Music for all maps/modes-Fixed Clonetrooper VO": lambda: os.path.join(GLOBAL_MOD_DIR, "Music_and_Clone_VO"),
-    "Restored r7 Vehicles": lambda: os.path.join(GLOBAL_MOD_DIR, "restored_r7_vehicles")
+    "Restored r7 Vehicles": lambda: os.path.join(GLOBAL_MOD_DIR, "restored_r7_vehicles"),
+    "r9 Restored Melee Classes": lambda: os.path.join(GLOBAL_MOD_DIR, "RestoredMeleeClasses")
 }
 
 
@@ -1286,8 +1309,8 @@ def main_menu():
     root = tk.Tk()
     root.title(TITLE)
 
-    root.geometry("1530x740")
-    root.minsize(1530, 740)
+    root.geometry("1530x770")
+    root.minsize(1530, 770)
 
     try:
         root.iconbitmap(resource_path(ICON_PATH))
