@@ -80,7 +80,7 @@
     },
     {
       "name": "Music_and_Clone_VO",
-      "version": "1.1",
+      "version": "1.2",
       "dir": "Music_and_Clone_VO",
       "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/mod_update_v1/Music_and_Clone_VO.zip"
     },
@@ -99,7 +99,7 @@
   ],
 
   "installer": {
-    "version": "5.8",
-    "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/swbf3_wii_mod_installer_v4.1/SWBF3_Wii_Mod_Installer_v5.8.exe"
+    "version": "5.9",
+    "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/swbf3_wii_mod_installer_v4.1/SWBF3_Wii_Mod_Installer_v5.9.exe"
   }
 }
