@@ -95,11 +95,17 @@
       "version": "1.2",
       "dir": "RestoredMeleeClasses",
       "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/mod_update_v1/RestoredMeleeClasses.zip"
+    },
+    {
+      "name": "ClassUniqueIcons",
+      "version": "1.0",
+      "dir": "ClassUniqueIcons",
+      "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/mod_update_v1/ClassUniqueIcons.zip"
     }
   ],
 
   "installer": {
-    "version": "6.1",
-    "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/swbf3_wii_mod_installer_v4.1/SWBF3_Wii_Mod_Installer_v6.1.exe"
+    "version": "6.2",
+    "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/swbf3_wii_mod_installer_v4.1/SWBF3_Wii_Mod_Installer_v6.2.exe"
   }
 }
