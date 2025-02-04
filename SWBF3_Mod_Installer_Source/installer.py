@@ -1,12 +1,8 @@
 # installer.py
 import os
 import shutil
-import tempfile
 import subprocess
 import threading
-import requests
-import json
-import time
 import platform
 from pathlib import Path
 from utils import log_message, create_directory, copy_files, print_to_console
@@ -180,6 +176,11 @@ def install_restored_melee_classes():
     game_data_dir = Path(config.GLOBAL_GAME_DIR) / "DATA"
     copy_files(mod_dir_path, game_data_dir)
 
+def install_unique_icons():
+    mod_dir_path = Path(config.GLOBAL_MOD_DIR) / "ClassUniqueIcons"
+    game_data_dir = Path(config.GLOBAL_GAME_DIR) / "DATA"
+    copy_files(mod_dir_path, game_data_dir)
+
 # Mapping of mod names to their installation functions
 MODS = {
     "Muted Blank Audio": install_muted_blank_audio,
@@ -194,7 +195,8 @@ MODS = {
     "Unlocked PC/Xbox 360 Features in Frontend": install_pc_xbox_features,
     "Music for all maps/modes-Fixed Clonetrooper VO": install_music_clonetrooper_vo,
     "Restored r7 Vehicles": install_restored_r7_vehicles,
-    "r9 Restored Melee Classes/Class Unique Icons Fix": install_restored_melee_classes
+    "r9 Restored Melee Classes(Class Unique Icons Fix Included)": install_restored_melee_classes,
+    "Class Unique Icons Fix": install_unique_icons
 }
 
 MODS_REQUIRING_COMPILATION = {
@@ -203,7 +205,8 @@ MODS_REQUIRING_COMPILATION = {
     "Unlocked PC/Xbox 360 Features in Frontend",
     "Music for all maps/modes-Fixed Clonetrooper VO",
     "Restored r7 Vehicles",
-    "r9 Restored Melee Classes/Class Unique Icons Fix",
+    "r9 Restored Melee Classes(Class Unique Icons Fix Included)",
+    "Class Unique Icons Fix",
 }
 
 # Mapping mod names to functions that return their directories
@@ -220,7 +223,8 @@ MODS_DIRECTORY = {
     "Unlocked PC/Xbox 360 Features in Frontend": lambda: os.path.join(config.GLOBAL_MOD_DIR, "frontend_preview"),
     "Music for all maps/modes-Fixed Clonetrooper VO": lambda: os.path.join(config.GLOBAL_MOD_DIR, "Music_and_Clone_VO"),
     "Restored r7 Vehicles": lambda: os.path.join(config.GLOBAL_MOD_DIR, "restored_r7_vehicles"),
-    "r9 Restored Melee Classes/Class Unique Icons Fix": lambda: os.path.join(config.GLOBAL_MOD_DIR, "RestoredMeleeClasses")
+    "r9 Restored Melee Classes(Class Unique Icons Fix Included)": lambda: os.path.join(config.GLOBAL_MOD_DIR, "RestoredMeleeClasses"),
+    "Class Unique Icons Fix": lambda: os.path.join(config.GLOBAL_MOD_DIR, "ClassUniqueIcons"),
 }
 
 # -------------------Installation Process Functions--------------------
@@ -257,6 +261,11 @@ def check_install_conditions(mod_vars):
             print_to_console("Error: 'Music for all maps/modes-Fixed Clonetrooper VO' is incompatible with 'Restored r7 Vehicles'.", "error")
         else:
             warnings.append("Warning: 'Music for all maps/modes-Fixed Clonetrooper VO' will override lighting changes.")
+    if "Class Unique Icons Fix" in selected_mods:
+        if "r9 Restored Melee Classes(Class Unique Icons Fix Included)" in selected_mods:
+            print_to_console("Error: 'Class Unique Icons Fix' is incompatible with 'r9 Restored Melee Classes(Class Unique Icons Fix Included)'. Please install one or the other.", "error")
+        else:
+            warnings.append("Warning: 'Class Unique Icons Fix Included' is not campatible with 'r9 Restored Melee Classes(Class Unique Icons Fix Included)'.")
 
     for warning in warnings:
         print_to_console(warning, "warning")
@@ -290,10 +299,10 @@ def check_file_name_conflicts(selected_mods):
 
     for file_name, mods in file_names.items():
         if len(mods) > 1:
-            if file_name == "invisible_hand.res" and {"Lighting Fix", "Music for all maps/modes-Fixed Clonetrooper VO"}.issubset(mods):
+            if file_name == "hudmgr.res" or {"Restored r7 Vehicles", "r9 Restored Melee Classes(Class Unique Icons Fix Included)", "Class Unique Icons Fix"}.issubset(mods):
                 print_to_console(f"[ERROR] File: {file_name} is present in mods: {', '.join(mods)} (DISMISSED)", "info")
                 continue
-            if file_name == "hudmgr.res" and {"Restored r7 Vehicles", "r9 Restored Melee Classes/Class Unique Icons Fix"}.issubset(mods):
+            if file_name == "invisible_hand.res" and {"Lighting Fix", "Music for all maps/modes-Fixed Clonetrooper VO"}.issubset(mods):
                 print_to_console(f"[ERROR] File: {file_name} is present in mods: {', '.join(mods)} (DISMISSED)", "info")
                 continue
             conflicts.append((file_name, list(mods)))
