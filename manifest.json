@@ -101,6 +101,12 @@
       "version": "1.0",
       "dir": "ClassUniqueIcons",
       "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/mod_update_v1/ClassUniqueIcons.zip"
+    },
+    {
+      "name": "GameRepairFiles",
+      "version": "1.0",
+      "dir": "repair_files",
+      "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/mod_update_v1/repair_files.zip"
     }
   ],
 
