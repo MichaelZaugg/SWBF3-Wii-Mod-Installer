@@ -3,12 +3,12 @@ import os
 import tkinter as tk
 from tkinter import Toplevel, Label, Entry, Button, Checkbutton, IntVar, Frame, Text, PhotoImage
 from tkinter import Frame, Text, Label, PhotoImage
-import tkinter.messagebox as messagebox
 from utils import resource_path, log_message, print_to_console
 import config
 from updater import check_for_updates
-from installer import start_install_process
+from installer import start_install_process, repair_game
 import json
+import threading
 
 # Global variables for the UI
 root = None
@@ -145,6 +145,9 @@ def setup_top_buttons(root, mod_vars):
     updates_button = Button(root, text="Check for Updates", command=check_for_updates)
     updates_button.grid(row=4, column=3, sticky='w', padx=10, pady=10)
     updates_button.configure(bg="#2b2b2b", fg="white", activebackground="#3c3f41", activeforeground="white")
+    repair_button = Button(root, text="Repair", command=repair_game_async)
+    repair_button.grid(row=5, column=2, sticky='w', padx=0, pady=0)
+    repair_button.configure(bg="#2b2b2b", fg="white", activebackground="#3c3f41", activeforeground="white")
 
 def setup_directory_ui(root):
     Label(root, text="Game Directory:").grid(row=1, column=0, sticky='w', padx=5)
@@ -318,11 +321,27 @@ def install_selected_mods(selected_mods):
     finally:
         stop_loading()
 
+def repair_game_async():
+    """Runs the repair process in a separate thread to prevent UI freeze."""
+    def run():
+        try:
+            start_loading()
+            log_message("Starting game repair...", "info")
+            repair_game(all=True)  # Runs the actual repair process
+            log_message("Game repair completed successfully.", "success")
+        except Exception as e:
+            log_message(f"Error during game repair: {e}", "error")
+        finally:
+            stop_loading()
+
+    repair_thread = threading.Thread(target=run, daemon=True)
+    repair_thread.start()
+
 def main_menu():
     global root
     root = tk.Tk()
     root.title(f"SWBF3 Wii Mod Installer v{config.current_version}")
-    root.geometry("1530x770")
+    root.geometry("1530x790")
     root.minsize(1530, 770)
     try:
         root.iconbitmap(resource_path("SWBF3Icon.ico"))

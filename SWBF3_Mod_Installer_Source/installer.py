@@ -8,13 +8,38 @@ from pathlib import Path
 from utils import log_message, create_directory, copy_files, print_to_console
 import config  # Always reference globals as config.GLOBAL_...
 
+
 # ------------------Mod Installation Functions-------------------------
 
-def compile_templates_res(only_res=False):
+def repair_game(all=False):
+    game_data_dir = Path(config.GLOBAL_GAME_DIR) / "DATA" / "files"
+    mod_dir_path = Path(config.GLOBAL_MOD_DIR) / "repair_files"
+    sys_dir = Path(config.GLOBAL_GAME_DIR) / "DATA" / "sys"
+
+    if all == False:
+        copy_files(mod_dir_path / "embed_wi_v4", game_data_dir / "assets" / "bf" / "embed_wi_v4")
+    elif all ==True:
+        copy_files(mod_dir_path / "embed_wi_v4", game_data_dir / "assets" / "bf" / "embed_wi_v4")
+        copy_files(mod_dir_path / "data", game_data_dir / "assets" / "bf" / "data")
+        try:
+            shutil.copy(mod_dir_path / "main.dol", sys_dir)
+            log_message(f"File 'main.dol' copied to {sys_dir}", "success")
+        except Exception as e:
+            log_message(f"Failed to copy 'main.dol' to {sys_dir}: {e}", "error")
+
+def compile_templates_res(only_res=False, forced=False):
+    """
+    Defult Compiler: compile_templates_and_res.bat
+    (only_res= True): Only does compile_all_res.bat
+    (only_res= True, forced= True): Only does compile_all_res_forced.bat
+    """
     game_data_dir = Path(config.GLOBAL_GAME_DIR) / "DATA" / "files"
     mod_dir_path = Path(config.GLOBAL_MOD_DIR)
+
     if only_res:
         batch_file = game_data_dir / "compile_all_res.bat"
+    elif only_res and forced:
+        batch_file = game_data_dir / "compile_all_res_forced.bat"
     else:
         batch_file = game_data_dir / "compile_templates_and_res.bat"
 
@@ -98,8 +123,8 @@ def install_4k_texture_pack():
 
 def install_lighting_fix():
     mod_dir_path = Path(config.GLOBAL_MOD_DIR)
-    game_data_dir = Path(config.GLOBAL_GAME_DIR) / "DATA" / "files"
-    copy_files(mod_dir_path / "SWBF3_Wii_Light_Fixes", game_data_dir)
+    game_data_dir = Path(config.GLOBAL_GAME_DIR) / "DATA" / "files" / "data"
+    copy_files(mod_dir_path / "SWBF3_Wii_Light_Fixes" / "data" , game_data_dir)
     compile_templates_res(only_res=True)
     mgrsetup_path = game_data_dir / "data" / "bf" / "mgrsetup"
     scene_descriptor_file = mgrsetup_path / "scene_descriptors.res"
@@ -118,7 +143,7 @@ def install_lighting_fix():
             log_message("Scene descriptor updated successfully.", "success")
         except subprocess.CalledProcessError as e:
             log_message(f"Error updating scene descriptors: {e}", "error")
-    compile_templates_res(only_res=True)
+    compile_templates_res(only_res=True, forced=True)
 
 def install_updated_debug_menu():
     mod_dir_path = Path(config.GLOBAL_MOD_DIR)
@@ -200,13 +225,13 @@ MODS = {
 }
 
 MODS_REQUIRING_COMPILATION = {
-    "Lighting Fix",
-    "Cloth Fix",
-    "Unlocked PC/Xbox 360 Features in Frontend",
-    "Music for all maps/modes-Fixed Clonetrooper VO",
-    "Restored r7 Vehicles",
-    "r9 Restored Melee Classes(Class Unique Icons Fix Included)",
-    "Class Unique Icons Fix",
+    "Lighting Fix", #compile_all_res
+    "Cloth Fix", #compile_all_res
+    "Unlocked PC/Xbox 360 Features in Frontend", #compile_all_res
+    "Music for all maps/modes-Fixed Clonetrooper VO", #compile_all_res_force
+    "Restored r7 Vehicles", #compile_templates
+    "r9 Restored Melee Classes(Class Unique Icons Fix Included)", #compile_templates
+    "Class Unique Icons Fix", #compile_templates
 }
 
 # Mapping mod names to functions that return their directories
@@ -362,7 +387,9 @@ def install_selected_mods(selected_mods):
 
             # Compile resources if necessary
             if other_compilation_mods_selected:
+                repair_game()
                 log_message("Compilation required. Starting compilation process...", "info")
+
                 compile_templates_res()
 
             # Install "Lighting Fix" last
@@ -372,6 +399,7 @@ def install_selected_mods(selected_mods):
                 log_message("Lighting Fix installed successfully.", "success")
 
             log_message("----- Installation Complete -----", "success")
+
 
         finally:
             stop_loading()  # Stop loading animation

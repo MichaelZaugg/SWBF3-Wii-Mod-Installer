@@ -5,7 +5,7 @@ from tkinter import filedialog
 from utils import print_to_console
 
 # Global flags and path variables
-current_version = "6.2"
+current_version = "6.5"
 TITLE = f"SWBF3 Wii Mod Installer v{current_version}"
 ICON_PATH = 'SWBF3Icon.ico'
 CONFIG_FILE = "mod_installer_config"
@@ -191,3 +191,7 @@ def reset_appdata_path(entry_widget):
     GLOBAL_CUSTOM_APPDATA = False
     save_config()
     print_to_console("AppData path reset to default Dolphin Emulator directory and saved in configuration.", "directory")
+
+
+
+
