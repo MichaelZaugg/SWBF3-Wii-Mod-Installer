@@ -4,14 +4,12 @@ import sys
 import time
 import threading
 import requests
-import signal
 import shutil
 import tempfile
 import json
 from utils import log_message
 import config  # Import the entire config module
-from installer import create_directory, copy_files
-import tkinter as tk
+from installer import create_directory
 
 MANIFEST_URL = "https://raw.githubusercontent.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/refs/heads/main/manifest.json"
 MOD_VERSIONS_URL = "https://raw.githubusercontent.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/refs/heads/main/mod_versions.json"
@@ -231,39 +229,32 @@ def download_mod_versions(mod_versions_path, url):
 
 def check_for_updates():
     """
-    Check for installer and mod updates while keeping the UI responsive.
-    This function:
-    - Starts a loading animation.
-    - Runs the update process in a background thread.
-    - Checks for both installer and mod updates.
-    - Stops the loading animation when done.
+    Check for updates while keeping the UI responsive.
+    Starts the progress bar, then stops it when finished.
     """
-
     def perform_update_sequence():
         try:
-            from ui import start_loading, stop_loading  # Lazy import to prevent circular imports
-            start_loading()  # Start the spinner animation
-
+            from ui import start_loading, stop_loading  # Lazy import to avoid circular imports
+            start_loading()  # Start the progress bar
             log_message("Starting update check...", "info")
+            
+            # ... (your update-checking logic here) ...
+            # For example, check for installer updates and mod updates.
             installer_updated = check_installer_update()
-
             if installer_updated:
-                log_message("Installer updated. Exiting the current program...", "info")
-                
-                # Ensure `root` is properly referenced before destroying
-                root = tk._default_root
-                if root is not None:
-                    root.after(0, root.destroy)  # Gracefully close the UI
-                    
-                os.kill(os.getpid(), signal.SIGTERM)  # Force exit after update
-
+                log_message("Installer updated. Please restart.", "info")
+                # Optionally, exit or prompt the user.
             else:
-                log_message("Checking for mod updates...", "info")
-                check_mod_versions()
-
+                log_message("No installer update found.", "success")
+            
+            # If you have mod update checking, do that here.
+            check_mod_versions()
+            
+        except Exception as e:
+            log_message(f"Error during update check: {e}", "error")
         finally:
-            stop_loading()  # Stop the spinner animation
-
-    # Run update process in a separate thread to prevent UI freezing
+            # Ensure that the progress bar is stopped regardless of outcome.
+            stop_loading()
+    
     update_thread = threading.Thread(target=perform_update_sequence, daemon=True)
     update_thread.start()

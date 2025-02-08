@@ -1,9 +1,6 @@
 # utils.py
 import os
 import sys
-import shutil
-import time
-from pathlib import Path
 
 # Shared global variable for the UI console widget.
 console_text = None

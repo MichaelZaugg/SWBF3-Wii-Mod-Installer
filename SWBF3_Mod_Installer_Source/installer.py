@@ -11,21 +11,48 @@ import config  # Always reference globals as config.GLOBAL_...
 
 # ------------------Mod Installation Functions-------------------------
 
-def repair_game(all=False):
+def repair_game(all=False, progress_callback=None):
+    from pathlib import Path
+    import shutil
+    # Assume copy_files is defined/imported elsewhere.
+    
     game_data_dir = Path(config.GLOBAL_GAME_DIR) / "DATA" / "files"
     mod_dir_path = Path(config.GLOBAL_MOD_DIR) / "repair_files"
     sys_dir = Path(config.GLOBAL_GAME_DIR) / "DATA" / "sys"
 
-    if all == False:
+    # Build a list of tasks.
+    tasks = []
+    
+    def task_embed():
         copy_files(mod_dir_path / "embed_wi_v4", game_data_dir / "assets" / "bf" / "embed_wi_v4")
-    elif all ==True:
-        copy_files(mod_dir_path / "embed_wi_v4", game_data_dir / "assets" / "bf" / "embed_wi_v4")
-        copy_files(mod_dir_path / "data", game_data_dir / "assets" / "bf" / "data")
-        try:
-            shutil.copy(mod_dir_path / "main.dol", sys_dir)
-            log_message(f"File 'main.dol' copied to {sys_dir}", "success")
-        except Exception as e:
-            log_message(f"Failed to copy 'main.dol' to {sys_dir}: {e}", "error")
+    tasks.append(("Copy embed_wi_v4", task_embed))
+    
+    if all:
+        def task_data():
+            copy_files(mod_dir_path / "data", game_data_dir / "assets" / "bf" / "data")
+        tasks.append(("Copy data", task_data))
+        
+        def task_main_dol():
+            try:
+                shutil.copy(mod_dir_path / "main.dol", sys_dir)
+                log_message(f"File 'main.dol' copied to {sys_dir}", "success")
+            except Exception as e:
+                log_message(f"Failed to copy 'main.dol' to {sys_dir}: {e}", "error")
+        tasks.append(("Copy main.dol", task_main_dol))
+    
+    total_tasks = len(tasks)
+    for index, (desc, task_func) in enumerate(tasks):
+        log_message(f"Starting: {desc}", "info")
+        task_func()
+        if progress_callback:
+            # Calculate progress (e.g., if there are 3 tasks, after first task progress is 0.33, etc.)
+            progress = (index + 1) / total_tasks
+            # Schedule the update on the main thread (if necessary):
+            from ui import root  # Ensure root is accessible.
+            root.after(0, lambda p=progress: progress_callback(p))
+    if progress_callback:
+        root.after(0, lambda: progress_callback(1.0))
+
 
 def compile_templates_res(only_res=False, forced=False):
     """
@@ -125,8 +152,8 @@ def install_lighting_fix():
     mod_dir_path = Path(config.GLOBAL_MOD_DIR)
     game_data_dir = Path(config.GLOBAL_GAME_DIR) / "DATA" / "files" / "data"
     copy_files(mod_dir_path / "SWBF3_Wii_Light_Fixes" / "data" , game_data_dir)
-    compile_templates_res(only_res=True)
-    mgrsetup_path = game_data_dir / "data" / "bf" / "mgrsetup"
+    compile_templates_res(only_res=True, forced= True)
+    mgrsetup_path = game_data_dir / "bf" / "mgrsetup"
     scene_descriptor_file = mgrsetup_path / "scene_descriptors.res"
     if scene_descriptor_file.exists():
         log_message("Updating scene descriptors...", "info")
