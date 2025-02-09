@@ -74,6 +74,7 @@ def compile_templates_res(only_res=False, forced=False, check_contents=False):
         if not batch_file.exists():
             log_message("compile_templates_and_res.bat not found. Copying necessary files...", "error")
             copy_files(mod_dir_path / "EmbeddedResCompiler", game_data_dir)
+        return
 
     if batch_file.exists():
         log_message("Starting compilation process...", "info")
