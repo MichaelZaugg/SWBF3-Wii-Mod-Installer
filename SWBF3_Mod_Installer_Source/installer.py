@@ -148,29 +148,32 @@ def install_4k_texture_pack():
     texture_dir = Path(config.GLOBAL_APPDATA_DIR) / "Load" / "Textures" / "RABAZZ"
     copy_files(mod_dir_path, texture_dir)
 
-def install_lighting_fix():
+def install_lighting_fix(scene_descriptor=False):
     mod_dir_path = Path(config.GLOBAL_MOD_DIR)
     game_data_dir = Path(config.GLOBAL_GAME_DIR) / "DATA" / "files" / "data"
+
+    if scene_descriptor:
+        mgrsetup_path = game_data_dir / "bf" / "mgrsetup"
+        scene_descriptor_file = mgrsetup_path / "scene_descriptors.res"
+        if scene_descriptor_file.exists():
+            log_message("Updating scene descriptors...", "info")
+            try:
+                subprocess.run(
+                    [
+                        "powershell",
+                        "-Command",
+                        f"(Get-Content '{scene_descriptor_file}') -replace '0.118128', '0.118128' | Set-Content '{scene_descriptor_file}'"
+                    ],
+                    check=True,
+                    text=True
+                )
+                log_message("Scene descriptor updated successfully.", "success")
+            except subprocess.CalledProcessError as e:
+                log_message(f"Error updating scene descriptors: {e}", "error")
+
+        return
+    
     copy_files(mod_dir_path / "SWBF3_Wii_Light_Fixes" / "data" , game_data_dir)
-    compile_templates_res(only_res=True, forced= True)
-    mgrsetup_path = game_data_dir / "bf" / "mgrsetup"
-    scene_descriptor_file = mgrsetup_path / "scene_descriptors.res"
-    if scene_descriptor_file.exists():
-        log_message("Updating scene descriptors...", "info")
-        try:
-            subprocess.run(
-                [
-                    "powershell",
-                    "-Command",
-                    f"(Get-Content '{scene_descriptor_file}') -replace '0.118128', '0.118128' | Set-Content '{scene_descriptor_file}'"
-                ],
-                check=True,
-                text=True
-            )
-            log_message("Scene descriptor updated successfully.", "success")
-        except subprocess.CalledProcessError as e:
-            log_message(f"Error updating scene descriptors: {e}", "error")
-    compile_templates_res(only_res=True, forced=True)
 
 def install_updated_debug_menu():
     mod_dir_path = Path(config.GLOBAL_MOD_DIR)
@@ -185,7 +188,6 @@ def install_cloth_fix():
     mod_dir_path = Path(config.GLOBAL_MOD_DIR)
     game_data_dir = Path(config.GLOBAL_GAME_DIR) / "DATA" / "files"
     copy_files(mod_dir_path / "Battlefront_III_Cloth_Fix" / "Battlefront_III_Cloth_Fix", game_data_dir)
-    copy_files(mod_dir_path / "EmbeddedResCompiler", game_data_dir)
 
 def install_4k_characters_model_fix():
     mod_dir_path = Path(config.GLOBAL_MOD_DIR)
@@ -393,13 +395,10 @@ def install_selected_mods(selected_mods):
             mods_to_install = [mod for mod, is_selected in selected_mods.items() if is_selected.get()]
             lighting_fix_selected = "Lighting Fix" in mods_to_install
             other_compilation_mods_selected = any(
-                mod in MODS_REQUIRING_COMPILATION for mod in mods_to_install if mod != "Lighting Fix"
+                mod in MODS_REQUIRING_COMPILATION for mod in mods_to_install #if mod != "Lighting Fix"
             )
 
-            if lighting_fix_selected:
-                mods_to_install.remove("Lighting Fix")  # Install it last
-
-            # Install all selected mods except "Lighting Fix"
+            #install mods
             for mod in mods_to_install:
                 log_message(f"Installing: {mod}", "info")
                 try:
@@ -421,8 +420,8 @@ def install_selected_mods(selected_mods):
 
             # Install "Lighting Fix" last
             if lighting_fix_selected:
-                log_message("Installing Lighting Fix last...", "info")
-                install_lighting_fix()
+                install_lighting_fix(scene_descriptor=True)
+                compile_templates_res(only_res=True)
                 log_message("Lighting Fix installed successfully.", "success")
 
             log_message("----- Installation Complete -----", "success")
