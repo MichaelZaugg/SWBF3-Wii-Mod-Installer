@@ -143,7 +143,7 @@ def setup_top_panel(parent):
     # Load and pack the image on the left.
     try:
         image_path = resource_path("image.png")
-        fun_image = ctk.CTkImage(light_image=Image.open(image_path), size=(140, 85))
+        fun_image = ctk.CTkImage(light_image=Image.open(image_path), size=(245, 103))
         image_label = ctk.CTkLabel(top_panel, image=fun_image, text="")
         image_label.pack(side="left", padx=5, pady=5)
         # Keep a reference so it is not garbage-collected.
