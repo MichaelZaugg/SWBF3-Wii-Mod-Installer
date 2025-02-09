@@ -54,7 +54,7 @@ def repair_game(all=False, progress_callback=None):
         root.after(0, lambda: progress_callback(1.0))
 
 
-def compile_templates_res(only_res=False, forced=False):
+def compile_templates_res(only_res=False, forced=False, check_contents=False):
     """
     Defult Compiler: compile_templates_and_res.bat
     (only_res= True): Only does compile_all_res.bat
@@ -70,9 +70,10 @@ def compile_templates_res(only_res=False, forced=False):
     else:
         batch_file = game_data_dir / "compile_templates_and_res.bat"
 
-    if not batch_file.exists():
-        log_message("compile_templates_and_res.bat not found. Copying necessary files...", "error")
-        copy_files(mod_dir_path / "EmbeddedResCompiler", game_data_dir)
+    if check_contents:
+        if not batch_file.exists():
+            log_message("compile_templates_and_res.bat not found. Copying necessary files...", "error")
+            copy_files(mod_dir_path / "EmbeddedResCompiler", game_data_dir)
 
     if batch_file.exists():
         log_message("Starting compilation process...", "info")
@@ -380,6 +381,8 @@ def install_selected_mods(selected_mods):
             from ui import start_loading, stop_loading  # Lazy import to prevent circular imports
             start_loading()  # Start loading animation
 
+            compile_templates_res(check_contents=True)
+
             if not check_install_conditions(selected_mods):
                 log_message("Installation aborted due to errors.", "error")
                 return
@@ -421,7 +424,7 @@ def install_selected_mods(selected_mods):
             # Install "Lighting Fix" last
             if lighting_fix_selected:
                 install_lighting_fix(scene_descriptor=True)
-                compile_templates_res(only_res=True)
+                compile_templates_res(only_res=True, forced=True)
                 log_message("Lighting Fix installed successfully.", "success")
 
             log_message("----- Installation Complete -----", "success")
