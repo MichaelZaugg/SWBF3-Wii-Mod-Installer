@@ -4,6 +4,9 @@
 
 Once everything is downloaded and set up, it should take roughly **5 minutes** to install.
 
+### **I need a video walkthrough:**
+[You can watch a video here.](https://youtu.be/wxS2aQExOJw?si=fxBKt4HvDNVmJq-x)
+
 ### **What should I do if the installer isn’t working?**
 
 - Make sure your game and mod directory is correct.
