@@ -125,7 +125,13 @@ def update_mod(mod_dir, download_url, mod_name, remote_version, mod_versions_pat
     temp_zip_path = None
     temp_extract_dir = None
     try:
-        create_directory(mod_dir)
+        # Check if the Mod directory exists and delete
+        if os.path.exists(mod_dir):
+            shutil.rmtree(mod_dir)
+        
+        stop = input("PAUSE")
+        os.makedirs(mod_dir)  
+
         log_message(f"Downloading files for {mod_name}...", "info")
         response = requests.get(download_url, stream=True)
         response.raise_for_status()

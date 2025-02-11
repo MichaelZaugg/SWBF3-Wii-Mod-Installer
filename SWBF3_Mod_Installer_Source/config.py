@@ -5,7 +5,7 @@ from tkinter import filedialog
 from utils import print_to_console
 
 # Global flags and path variables
-current_version = "6.9"
+current_version = "7.0"
 TITLE = f"SWBF3 Wii Mod Installer v{current_version}"
 ICON_PATH = 'SWBF3Icon.ico'
 CONFIG_FILE = "mod_installer_config"
