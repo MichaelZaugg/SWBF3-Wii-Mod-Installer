@@ -72,13 +72,8 @@ def check_mod_versions():
     mod_versions_path = os.path.join(config.GLOBAL_MOD_DIR, "mod_versions.json")
     try:
         if not os.path.exists(mod_versions_path):
-            log_message("mod_versions.json not found. Downloading the latest version...", "info")
-            response = requests.get(MOD_VERSIONS_URL, stream=True)
-            response.raise_for_status()
-            with open(mod_versions_path, "wb") as file:
-                for chunk in response.iter_content(chunk_size=8192):
-                    file.write(chunk)
-            log_message(f"mod_versions.json downloaded and saved to {mod_versions_path}.", "success")
+            log_message("mod_versions.json not found. Please download Mods.zip", "error")
+            raise Exception
 
         local_mod_versions = {}
         with open(mod_versions_path, "r", encoding="utf-8") as file:
@@ -233,28 +228,28 @@ def check_for_updates():
     Starts the progress bar, then stops it when finished.
     """
     def perform_update_sequence():
+        from ui import start_loading, stop_loading  # Lazy import to avoid circular imports
         try:
-            from ui import start_loading, stop_loading  # Lazy import to avoid circular imports
             start_loading()  # Start the progress bar
             log_message("Starting update check...", "info")
             
-            # ... (your update-checking logic here) ...
-            # For example, check for installer updates and mod updates.
+            check_mod_versions()
+
             installer_updated = check_installer_update()
             if installer_updated:
                 log_message("Installer updated. Please restart.", "info")
+                stop_loading()
                 # Optionally, exit or prompt the user.
             else:
                 log_message("No installer update found.", "success")
+                stop_loading()
             
-            # If you have mod update checking, do that here.
-            check_mod_versions()
             
         except Exception as e:
             log_message(f"Error during update check: {e}", "error")
         finally:
             # Ensure that the progress bar is stopped regardless of outcome.
             stop_loading()
-    
+        stop_loading()
     update_thread = threading.Thread(target=perform_update_sequence, daemon=True)
     update_thread.start()
