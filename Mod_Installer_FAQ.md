@@ -53,6 +53,9 @@ It means you have not downloaded and extracted either the unpacked version of th
 - Redownload/ update the installer if necessary, as updates may have fixed certain issues.
 - Run the "Repair" option in the installer
 - Ask in the Mod Installer Discord
+### **How do I update/ get the new mods and installer?**
+
+Hit check for updates.
 
 ### **Do I need to redownload Mods.zip every time there's an update or new mod?**
 
@@ -69,7 +72,7 @@ If the installer gave no errors when installing a mod and the mod is not working
 - Go to the mod installer discord form
 - Say which mod is not working
 - Include a screenshot if applicable
-- Give exact details such as, was it installed on a new copy of the game?, which mods are also installed?, did you install mulitple mods with it and which ones?.
+- Give exact details such as, was it installed on a new copy of the game?, which mods are also installed?, did you install mulitple mods with it and which ones?, what version is your installer? etc...
 
 ### **Where can I get the latest version of the installer?**
 
