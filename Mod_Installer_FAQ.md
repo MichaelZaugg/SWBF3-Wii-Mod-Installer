@@ -69,7 +69,7 @@ If the installer gave no errors when installing a mod and the mod is not working
 - Go to the mod installer discord form
 - Say which mod is not working
 - Include a screenshot if applicable
-- Give exact details such as, was it installed on a new copy of the game?, which mods are also installed?, did you install mulitple mods with it and which ones?.
+- Give exact details such as, was it installed on a new copy of the game?, which mods are also installed?, did you install mulitple mods with it and which ones?, what version is your installer? etc...
 
 ### **Where can I get the latest version of the installer?**
 
