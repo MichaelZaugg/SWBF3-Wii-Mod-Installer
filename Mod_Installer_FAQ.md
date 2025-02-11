@@ -53,6 +53,9 @@ It means you have not downloaded and extracted either the unpacked version of th
 - Redownload/ update the installer if necessary, as updates may have fixed certain issues.
 - Run the "Repair" option in the installer
 - Ask in the Mod Installer Discord
+### **How do I update/ get the new mods and installer?**
+
+Hit check for updates.
 
 ### **Do I need to redownload Mods.zip every time there's an update or new mod?**
 
