@@ -129,7 +129,6 @@ def update_mod(mod_dir, download_url, mod_name, remote_version, mod_versions_pat
         if os.path.exists(mod_dir):
             shutil.rmtree(mod_dir)
         
-        stop = input("PAUSE")
         os.makedirs(mod_dir)  
 
         log_message(f"Downloading files for {mod_name}...", "info")
