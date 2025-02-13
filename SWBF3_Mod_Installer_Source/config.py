@@ -1,11 +1,11 @@
-# config.py
 import os
 import json
 from tkinter import filedialog
 from utils import print_to_console
+import platform  # Added for OS detection
 
 # Global flags and path variables
-current_version = "7.1"
+current_version = "7.2"
 TITLE = f"SWBF3 Wii Mod Installer v{current_version}"
 ICON_PATH = 'SWBF3Icon.ico'
 CONFIG_FILE = "mod_installer_config"
@@ -98,44 +98,50 @@ def find_mods_folder(base_path):
 
 def search_dolphin_emulator(entry_widget):
     global GLOBAL_APPDATA_DIR, GLOBAL_CUSTOM_APPDATA
-    base_path = "C:\\Users"
     found_paths = []
-    for user in os.listdir(base_path):
-        user_path = os.path.join(base_path, user, "AppData", "Roaming", "Dolphin Emulator").replace('/', '\\')
-        if os.path.exists(user_path):
-            found_paths.append(user_path)
+    system = platform.system()
+    if system == "Windows":
+        base_path = "C:\\Users"
+        for user in os.listdir(base_path):
+            user_path = os.path.join(base_path, user, "AppData", "Roaming", "Dolphin Emulator").replace('/', '\\')
+            if os.path.exists(user_path):
+                found_paths.append(user_path)
+    elif system == "Linux":
+        base_path = os.path.expanduser("~")
+        # Check the new Flatpak Dolphin Emulator path first
+        flatpak_path = os.path.join(base_path, ".var", "app", "org.DolphinEmu.dolphin-emu", "data", "dolphin-emu")
+        if os.path.exists(flatpak_path):
+            found_paths.append(flatpak_path)
+        # Also check the legacy Dolphin Emulator path
+        legacy_path = os.path.join(base_path, ".config", "dolphin-emu")
+        if os.path.exists(legacy_path):
+            found_paths.append(legacy_path)
+        # Only mark as custom if a valid path was found
+        GLOBAL_CUSTOM_APPDATA = True if found_paths else False
+
     if found_paths:
         GLOBAL_APPDATA_DIR = found_paths[0]
-        GLOBAL_CUSTOM_APPDATA = False
         print_to_console(f"AppData Dir: {GLOBAL_APPDATA_DIR}", "directory")
         if entry_widget:
             entry_widget.delete(0, "end")
             entry_widget.insert(0, GLOBAL_APPDATA_DIR)
     else:
         GLOBAL_APPDATA_DIR = ""
-        GLOBAL_CUSTOM_APPDATA = False
+        if system != "Linux":
+            GLOBAL_CUSTOM_APPDATA = False
         print_to_console("Dolphin Emulator directory not found.", "error")
         if entry_widget:
             entry_widget.delete(0, "end")
             entry_widget.insert(0, "Dolphin Emulator directory not found.")
 
-def browse_folder(entry_widget, update_global):
-    def find_mod_versions_folder(base_path, max_depth=3):
-        def search_folder(current_path, current_depth):
-            if current_depth > max_depth:
-                return None
-            if "mod_versions.json" in os.listdir(current_path):
-                return current_path
-            for entry in os.listdir(current_path):
-                entry_path = os.path.join(current_path, entry)
-                if os.path.isdir(entry_path):
-                    result = search_folder(entry_path, current_depth + 1)
-                    if result:
-                        return result
-            return None
-        return search_folder(base_path, 1)
 
-    folder_selected = filedialog.askdirectory().replace('/', '\\')
+def browse_folder(entry_widget, update_global):
+    import platform
+    # Only replace slashes on Windows
+    if platform.system() == "Windows":
+        folder_selected = filedialog.askdirectory().replace('/', '\\')
+    else:
+        folder_selected = filedialog.askdirectory()
     if folder_selected:
         if update_global == "game":
             result_path = contains_required_dirs(folder_selected)
@@ -152,7 +158,7 @@ def browse_folder(entry_widget, update_global):
                 entry_widget.insert(0, "Invalid game directory. Missing 'DATA' or 'UPDATE'.")
                 GLOBAL_GAME_DIR = ""
         elif update_global == "mod":
-            mods_path = find_mod_versions_folder(folder_selected, max_depth=3)
+            mods_path = find_mods_folder(folder_selected)
             if mods_path:
                 global GLOBAL_MOD_DIR
                 GLOBAL_MOD_DIR = mods_path
@@ -191,7 +197,3 @@ def reset_appdata_path(entry_widget):
     GLOBAL_CUSTOM_APPDATA = False
     save_config()
     print_to_console("AppData path reset to default Dolphin Emulator directory and saved in configuration.", "directory")
-
-
-
-

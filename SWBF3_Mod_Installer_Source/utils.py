@@ -6,11 +6,11 @@ import sys
 console_text = None
 
 def resource_path(relative_path):
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
+    base_path = getattr(sys, '_MEIPASS', os.path.abspath("."))
+    print("Base path:", base_path)  # Debug print
+    print("Files in base path:", os.listdir(base_path))  # Debug print to see what's included
     return os.path.join(base_path, relative_path)
+
 
 def print_to_console(message, tag=None, end="\n"):
     global console_text

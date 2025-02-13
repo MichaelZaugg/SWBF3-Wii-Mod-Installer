@@ -9,10 +9,19 @@ import tempfile
 import json
 from utils import log_message
 import config  # Import the entire config module
-from installer import create_directory
+import platform
 
 MANIFEST_URL = "https://raw.githubusercontent.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/refs/heads/main/manifest.json"
 MOD_VERSIONS_URL = "https://raw.githubusercontent.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/refs/heads/main/mod_versions.json"
+
+def fetch_manifest():
+    try:
+        response = requests.get(MANIFEST_URL)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        log_message(f"Error fetching manifest: {e}", "error")
+        return None
 
 def fetch_manifest():
     try:
@@ -34,7 +43,17 @@ def check_installer_update():
 
             remote_installer = manifest.get("installer", {})
             remote_version = remote_installer.get("version")
-            download_url = remote_installer.get("download_url")
+
+            system = platform.system()
+            if system == "Windows":
+                download_url = remote_installer.get("download_url")
+                ext = ".exe"
+            elif system == "Linux":
+                download_url = remote_installer.get("download_url_linux")
+                ext = ".sh"
+            else:
+                log_message("Unsupported OS detected. Skipping update.", "error")
+                return False
 
             if not remote_version or not download_url:
                 log_message("Installer version or download URL missing in manifest.", "error")
@@ -43,7 +62,7 @@ def check_installer_update():
             current_installer_path = os.path.abspath(sys.argv[0])
             new_installer_path = os.path.join(
                 os.path.dirname(current_installer_path),
-                f"SWBF3_Wii_Mod_Installer_v{remote_version}.exe"
+                f"SWBF3_Wii_Mod_Installer_v{remote_version}{ext}"
             )
 
             if remote_version > config.current_version:
@@ -66,7 +85,7 @@ def check_installer_update():
             log_message(f"Error checking for installer updates: {e}", "error")
             return False
     download_and_update()
-
+    
 def check_mod_versions():
     # Use the live mod directory from config
     mod_versions_path = os.path.join(config.GLOBAL_MOD_DIR, "mod_versions.json")

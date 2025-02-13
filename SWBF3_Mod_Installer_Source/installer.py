@@ -56,17 +56,18 @@ def repair_game(all=False, progress_callback=None):
 
 def compile_templates_res(only_res=False, forced=False, check_contents=False):
     """
-    Defult Compiler: compile_templates_and_res.bat
-    (only_res= True): Only does compile_all_res.bat
-    (only_res= True, forced= True): Only does compile_all_res_forced.bat
+    Default Compiler: compile_templates_and_res.bat
+    (only_res=True): Only does compile_all_res.bat
+    (only_res=True, forced=True): Only does compile_all_res_forced.bat
     """
+    import platform
     game_data_dir = Path(config.GLOBAL_GAME_DIR) / "DATA" / "files"
     mod_dir_path = Path(config.GLOBAL_MOD_DIR)
 
-    if only_res:
-        batch_file = game_data_dir / "compile_all_res.bat"
-    elif only_res and forced:
+    if forced and only_res:
         batch_file = game_data_dir / "compile_all_res_forced.bat"
+    elif only_res:
+        batch_file = game_data_dir / "compile_all_res.bat"
     else:
         batch_file = game_data_dir / "compile_templates_and_res.bat"
 
@@ -80,8 +81,14 @@ def compile_templates_res(only_res=False, forced=False, check_contents=False):
         log_message("Starting compilation process...", "info")
         def run_batch_file():
             try:
+                system = platform.system()
+                # Use Wine for non-Windows systems
+                if system == "Windows":
+                    command = str(batch_file)
+                else:
+                    command = f'wine cmd /c "{batch_file}"'
                 process = subprocess.Popen(
-                    str(batch_file),
+                    command,
                     shell=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
@@ -103,13 +110,14 @@ def compile_templates_res(only_res=False, forced=False, check_contents=False):
                     log_message("Resource compilation completed successfully.", "success")
                 else:
                     log_message("Error during resource compilation.", "error")
-            finally:
-                pass
+            except Exception as e:
+                log_message(f"Exception during compilation: {e}", "error")
         compile_thread = threading.Thread(target=run_batch_file)
         compile_thread.start()
         compile_thread.join()
     else:
         log_message("compile_templates_and_res.bat still not found after copying. Please check manually.", "error")
+
 
 def install_dynamic_input_textures():
     app_data = Path(config.GLOBAL_APPDATA_DIR) / "Load"
@@ -120,8 +128,9 @@ def install_dynamic_input_textures():
     create_directory(dynamic_textures_dir)
     create_directory(rabazz_dir)
 
-    def copy_with_xcopy(src, dest):
-        if platform.system() == "Windows":
+    def copy_with_command(src, dest):
+        system = platform.system()
+        if system == "Windows":
             cmd = f'xcopy "{src}" "{dest}" /E /I /Q /Y'
             log_message(f"Running: {cmd}", "info")
             try:
@@ -133,12 +142,18 @@ def install_dynamic_input_textures():
             except Exception as e:
                 log_message(f"Failed to copy {src} to {dest}: {e}", "error")
         else:
-            log_message("xcopy is not supported on non-Windows systems.", "error")
+            # For Linux (and other OS), use Python's shutil.copytree
+            try:
+                shutil.copytree(src, dest, dirs_exist_ok=True)
+                log_message(f"Copied {src} to {dest} successfully.", "success")
+            except Exception as e:
+                log_message(f"Failed to copy {src} to {dest} on {system}: {e}", "error")
 
     log_message("Copying Dynamic Input Textures...", "info")
-    copy_with_xcopy(mod_dir_path / "DynamicInputTextures" / "DynamicInputTextures", dynamic_textures_dir)
+    copy_with_command(mod_dir_path / "DynamicInputTextures" / "DynamicInputTextures", dynamic_textures_dir)
     log_message("Copying RABAZZ textures...", "info")
-    copy_with_xcopy(mod_dir_path / "RABAZZ_dynamic" / "RABAZZ", rabazz_dir)
+    copy_with_command(mod_dir_path / "RABAZZ_dynamic" / "RABAZZ", rabazz_dir)
+
 
 def install_muted_blank_audio():
     mod_dir_path = Path(config.GLOBAL_MOD_DIR)
@@ -160,22 +175,32 @@ def install_lighting_fix(scene_descriptor=False):
         if scene_descriptor_file.exists():
             log_message("Updating scene descriptors...", "info")
             try:
-                subprocess.run(
-                    [
-                        "powershell",
-                        "-Command",
-                        f"(Get-Content '{scene_descriptor_file}') -replace '0.118128', '0.118128' | Set-Content '{scene_descriptor_file}'"
-                    ],
-                    check=True,
-                    text=True
-                )
+                import platform
+                if platform.system() == "Windows":
+                    subprocess.run(
+                        [
+                            "powershell",
+                            "-Command",
+                            f"(Get-Content '{scene_descriptor_file}') -replace '0.118128', '0.118128' | Set-Content '{scene_descriptor_file}'"
+                        ],
+                        check=True,
+                        text=True
+                    )
+                else:
+                    # On Linux, perform the update in Python
+                    with open(scene_descriptor_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    # Perform the desired replacement (update the values as needed)
+                    new_content = content.replace('0.118128', '0.118128')
+                    with open(scene_descriptor_file, 'w', encoding='utf-8') as f:
+                        f.write(new_content)
                 log_message("Scene descriptor updated successfully.", "success")
-            except subprocess.CalledProcessError as e:
+            except Exception as e:
                 log_message(f"Error updating scene descriptors: {e}", "error")
-
         return
-    
-    copy_files(mod_dir_path / "SWBF3_Wii_Light_Fixes" / "data" , game_data_dir)
+
+    copy_files(mod_dir_path / "SWBF3_Wii_Light_Fixes" / "data", game_data_dir)
+
 
 def install_updated_debug_menu():
     mod_dir_path = Path(config.GLOBAL_MOD_DIR)

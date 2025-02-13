@@ -444,18 +444,22 @@ def main_menu():
     root.title(f"SWBF3 Wii Mod Installer v{current_version}")
     root.geometry("1530x790")
     try:
-        root.iconbitmap(resource_path("SWBF3Icon.ico"))
+        import platform
+        if platform.system() == "Windows":
+            root.iconbitmap(resource_path("SWBF3Icon.ico"))
+        else:
+            from tkinter import PhotoImage
+            icon = PhotoImage(file=resource_path("SWBF3Icon.png"))
+            root.iconphoto(False, icon)
     except Exception as e:
-        print("Error setting ICO icon:", e)
+        print("Error setting icon:", e)
     
-    # Configure the root grid: row 0 for main UI, row 1 for the progress bar.
+    # Configure the root grid and launch the UI.
     root.grid_rowconfigure(0, weight=1)
     root.grid_rowconfigure(1, weight=0)
     root.grid_columnconfigure(0, weight=1)
-    
     root.bind("<Configure>", on_resize)
-    
-    mod_vars = setup_ui()  # This function sets up the rest of your UI.
+    mod_vars = setup_ui()
     root.mainloop()
 
 

@@ -1,0 +1,10 @@
+#!/bin/bash
+python -m PyInstaller --onefile --noconsole --name "SWBF3_Wii_Mod_Installer_v" --icon "SWBF3Icon.png" --add-data "SWBF3Icon.ico:." --add-data "image.png:." main.py
+read -p "Press any key to continue..."
+
+
+
+Make it executable with:
+chmod +x compile.sh
+Run it with:
+./compile.sh
