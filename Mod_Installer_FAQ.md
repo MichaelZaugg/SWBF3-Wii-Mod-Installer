@@ -17,6 +17,16 @@ Once everything is downloaded and set up, it should take roughly **5 minutes** t
 
 Hit the "Repair" button to repair your game and try installing mods again.
 
+### **How do I run the program on Linux?**
+
+  - Give execute permission to your script:
+
+  - chmod +x /path/to/yourscript.sh
+
+  - And to run your script:
+
+  - /path/to/yourscript.sh
+
 ### **How do I uninstall mods?**
 
 Hit the repair button to uninstall all mods.
