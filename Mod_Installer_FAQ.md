@@ -20,12 +20,12 @@ Hit the "Repair" button to repair your game and try installing mods again.
 ### **How do I run the program on Linux?**
 
 You will need to install these dependencies:
-• A compatible version of glibc and standard Linux libraries (usually already installed).
-• Tkinter support: 
+- A compatible version of glibc and standard Linux libraries (usually already installed).
+- Tkinter support: 
   sudo apt-get install python3-tk
-• Wine:
+- Wine:
   sudo apt-get install wine
-• Basic X11 libraries and a windowing system (which are typically part of your desktop environment).
+- Basic X11 libraries and a windowing system (which are typically part of your desktop environment).
 
 To run the installer:
      Give execute permission to your script:
