@@ -77,7 +77,7 @@ Hit check for updates.
 
 No, just hit check for updates and the installer will automaticlly download and manage everything.
 
-### **Why can't I select all mods and install?**
+### **Why can't I select all mods and install? "ERROR File: . . . is present in Mods . . .**
 
 Some mods are not compatible with each other and will overwrite/ break the game when installed together. Look at the errors to see which mods are not compatible and choose which ones you want installed.
 
