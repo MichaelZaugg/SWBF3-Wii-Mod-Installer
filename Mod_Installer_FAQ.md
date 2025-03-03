@@ -19,13 +19,19 @@ Hit the "Repair" button to repair your game and try installing mods again.
 
 ### **How do I run the program on Linux?**
 
-  - Give execute permission to your script:
+You will need to install these dependencies:
+- A compatible version of glibc and standard Linux libraries (usually already installed).
+- Tkinter support: 
+  sudo apt-get install python3-tk
+- Wine:
+  sudo apt-get install wine
+- Basic X11 libraries and a windowing system (which are typically part of your desktop environment).
 
-  - chmod +x /path/to/yourscript.sh
-
-  - And to run your script:
-
-  - /path/to/yourscript.sh
+To run the installer:
+     Give execute permission to your script:
+            chmod +x /path/to/yourscript.sh
+     And to run your script:
+            /path/to/yourscript.sh
 
 ### **How do I uninstall mods?**
 
@@ -71,7 +77,7 @@ Hit check for updates.
 
 No, just hit check for updates and the installer will automaticlly download and manage everything.
 
-### **Why can't I select all mods and install?**
+### **Why can't I select all mods and install? "ERROR File: . . . is present in Mods . . .**
 
 Some mods are not compatible with each other and will overwrite/ break the game when installed together. Look at the errors to see which mods are not compatible and choose which ones you want installed.
 
