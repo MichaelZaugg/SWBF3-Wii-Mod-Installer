@@ -107,12 +107,18 @@
       "version": "2.0",
       "dir": "repair_files",
       "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/mod_update_v1/repair_files.zip"
+    },
+    {
+      "name": "HD_interface",
+      "version": "1.0",
+      "dir": "HD_interface",
+      "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/mod_update_v1/HD_interface.zip"
     }
   ],
 
   "installer": {
-    "version": "7.2",
-    "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/swbf3_wii_mod_installer_v4.1/SWBF3_Wii_Mod_Installer_v7.2.exe",
+    "version": "7.3",
+    "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/swbf3_wii_mod_installer_v4.1/SWBF3_Wii_Mod_Installer_v7.3.exe",
     "download_url_linux": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/swbf3_wii_mod_installer_v4.1/SWBF3_Wii_Mod_Installer_v7.2_Linux"
   }
 }

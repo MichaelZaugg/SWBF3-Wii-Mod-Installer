@@ -254,7 +254,8 @@ def setup_mod_frame(parent):
         "4k texture pack Part 1, 2, 3, 4, 5",
         "Texture Pack: Faithful Health Bars",
         "Dynamic Input Textures",
-        "Minimaps Fix (For r904, Enable prefetch custom textures)"
+        "Minimaps Fix (For r904, Enable prefetch custom textures)",
+        "HD User Interface"
     ]
     game_mods = [
         "Lighting Fix",

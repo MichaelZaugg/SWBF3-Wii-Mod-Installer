@@ -262,6 +262,12 @@ def install_unique_icons():
     game_data_dir = Path(config.GLOBAL_GAME_DIR) / "DATA"
     copy_files(mod_dir_path, game_data_dir)
 
+def install_hd_interface():
+    mod_dir_path = Path(config.GLOBAL_MOD_DIR) / "HD_interface"
+    app_data_textures_dir = Path(config.GLOBAL_APPDATA_DIR) / "Load" / "Textures" / "RABAZZ"
+    
+    copy_files(mod_dir_path, app_data_textures_dir)
+
 # Mapping of mod names to their installation functions
 MODS = {
     "Muted Blank Audio": install_muted_blank_audio,
@@ -277,7 +283,8 @@ MODS = {
     "Music for all maps/modes-Fixed Clonetrooper VO": install_music_clonetrooper_vo,
     "Restored r7 Vehicles": install_restored_r7_vehicles,
     "r9 Restored Melee Classes(Class Unique Icons Fix Included)": install_restored_melee_classes,
-    "Class Unique Icons Fix": install_unique_icons
+    "Class Unique Icons Fix": install_unique_icons,
+    "HD User Interface": install_hd_interface
 }
 
 MODS_REQUIRING_COMPILATION = {
@@ -306,6 +313,7 @@ MODS_DIRECTORY = {
     "Restored r7 Vehicles": lambda: os.path.join(config.GLOBAL_MOD_DIR, "restored_r7_vehicles"),
     "r9 Restored Melee Classes(Class Unique Icons Fix Included)": lambda: os.path.join(config.GLOBAL_MOD_DIR, "RestoredMeleeClasses"),
     "Class Unique Icons Fix": lambda: os.path.join(config.GLOBAL_MOD_DIR, "ClassUniqueIcons"),
+    "HD User Interface": lambda: os.path.join(config.GLOBAL_MOD_DIR, "HD_interface"),
 }
 
 # -------------------Installation Process Functions--------------------
