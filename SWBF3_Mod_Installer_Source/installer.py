@@ -5,16 +5,13 @@ import subprocess
 import threading
 import platform
 from pathlib import Path
-from utils import log_message, create_directory, copy_files, print_to_console
+from utils import log_message, create_directory, copy_files, print_to_console, delete_files
 import config  # Always reference globals as config.GLOBAL_...
 
 
 # ------------------Mod Installation Functions-------------------------
 
 def repair_game(all=False, progress_callback=None):
-    from pathlib import Path
-    import shutil
-    # Assume copy_files is defined/imported elsewhere.
     
     game_data_dir = Path(config.GLOBAL_GAME_DIR) / "DATA" / "files"
     mod_dir_path = Path(config.GLOBAL_MOD_DIR) / "repair_files"
@@ -39,6 +36,35 @@ def repair_game(all=False, progress_callback=None):
             except Exception as e:
                 log_message(f"Failed to copy 'main.dol' to {sys_dir}: {e}", "error")
         tasks.append(("Copy main.dol", task_main_dol))
+    
+    total_tasks = len(tasks)
+    for index, (desc, task_func) in enumerate(tasks):
+        log_message(f"Starting: {desc}", "info")
+        task_func()
+        if progress_callback:
+            # Calculate progress (e.g., if there are 3 tasks, after first task progress is 0.33, etc.)
+            progress = (index + 1) / total_tasks
+            # Schedule the update on the main thread (if necessary):
+            from ui import root  # Ensure root is accessible.
+            root.after(0, lambda p=progress: progress_callback(p))
+    if progress_callback:
+        root.after(0, lambda: progress_callback(1.0))
+
+def uninstall_textures(progress_callback=None):
+    
+    #Remove Everything in RABAZZ and DynamicInputTextures in /Load
+    
+    
+    load_appdatadata_dir = Path(config.GLOBAL_APPDATA_DIR) / "Load"
+
+    # Build a list of tasks.
+    tasks = []
+    
+    def task_embed():
+        delete_files(load_appdatadata_dir / "Textures")
+        delete_files(load_appdatadata_dir / "DynamicInputTextures")
+    tasks.append(("Delete Textures", task_embed))
+    
     
     total_tasks = len(tasks)
     for index, (desc, task_func) in enumerate(tasks):

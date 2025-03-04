@@ -5,7 +5,7 @@ from utils import print_to_console
 import platform  # Added for OS detection
 
 # Global flags and path variables
-current_version = "7.3"
+current_version = "7.4"
 TITLE = f"SWBF3 Wii Mod Installer v{current_version}"
 ICON_PATH = 'SWBF3Icon.ico'
 CONFIG_FILE = "mod_installer_config"

@@ -7,7 +7,7 @@ import customtkinter as ctk
 from utils import resource_path, log_message, print_to_console
 import config
 from updater import check_for_updates
-from installer import start_install_process, repair_game
+from installer import start_install_process, repair_game, uninstall_textures
 
 # Global variables for debouncing and progress bar animation
 
@@ -265,7 +265,9 @@ def setup_mod_frame(parent):
         "Music for all maps/modes-Fixed Clonetrooper VO",
         "Restored r7 Vehicles",
         "r9 Restored Melee Classes(Class Unique Icons Fix Included)",
-        "Class Unique Icons Fix"
+        "Class Unique Icons Fix",
+        "Muted Blank Audio",
+        "Unlocked PC/Xbox 360 Features in Frontend"
     ]
     
     # Dictionary to hold IntVar for each mod.
@@ -342,6 +344,13 @@ def setup_actions_frame(parent, mod_vars):
         command=repair_game_async
     )
     repair_button.pack(side="left", expand=True, padx=5, pady=5)
+
+    uninstall_tex_button = ctk.CTkButton(
+        actions_frame,
+        text="Uninstall Texture Mods",
+        command=uninstall_tex_async
+    )
+    uninstall_tex_button.pack(side="left", expand=True, padx=5, pady=5)
     return actions_frame
 
 
@@ -385,6 +394,24 @@ def repair_game_async():
             log_message("Starting game repair...", "info")
             repair_game(all=True)
             log_message("Game repair completed successfully.", "success")
+        except Exception as e:
+            log_message(f"Error during game repair: {e}", "error")
+        finally:
+            stop_progress_bar()
+    repair_thread = threading.Thread(target=run, daemon=True)
+    repair_thread.start()
+
+def uninstall_tex_async():
+    """
+    Run the repair process in a separate thread to prevent UI freezing.
+    Uses the progress bar instead of a spinner.
+    """
+    def run():
+        try:
+            start_progress_bar()
+            log_message("Uninstalling Texture Mods...", "info")
+            uninstall_textures()
+            log_message("Uninstall completed successfully.", "success")
         except Exception as e:
             log_message(f"Error during game repair: {e}", "error")
         finally:
