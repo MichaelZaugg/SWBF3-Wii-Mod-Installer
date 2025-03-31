@@ -5,7 +5,7 @@ from utils import print_to_console
 import platform  # Added for OS detection
 
 # Global flags and path variables
-current_version = "7.4"
+current_version = "7.5"
 TITLE = f"SWBF3 Wii Mod Installer v{current_version}"
 ICON_PATH = 'SWBF3Icon.ico'
 CONFIG_FILE = "mod_installer_config"
@@ -86,15 +86,24 @@ def contains_required_dirs(base_path, depth=3):
                     return result
     return None
 
-def find_mods_folder(base_path):
-    for root, dirs, _ in os.walk(base_path):
-        for directory in dirs:
-            if directory.lower() == "mods":
-                mods_path = os.path.join(root, directory)
-                if os.path.exists(os.path.join(mods_path, "Mods")):
-                    return os.path.join(mods_path, "Mods")
-                return mods_path
+
+def find_mods_folder(base_path, max_depth=3):
+    for root, dirs, files in os.walk(base_path):
+        # Calculate depth relative to the base path
+        rel_path = os.path.relpath(root, base_path)
+        depth = 0 if rel_path == '.' else rel_path.count(os.sep) + 1
+        
+        # If deeper than max_depth, prune further search in this branch.
+        if depth > max_depth:
+            dirs[:] = []  # Prevent further descent in this branch.
+            continue
+        
+        # Check if the target file is in the current directory.
+        if "mod_versions.json" in files:
+            return os.path.join(root)
+    
     return None
+
 
 def search_dolphin_emulator(entry_widget):
     global GLOBAL_APPDATA_DIR, GLOBAL_CUSTOM_APPDATA
