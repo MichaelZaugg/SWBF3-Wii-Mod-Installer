@@ -5,7 +5,7 @@ from utils import print_to_console
 import platform  # Added for OS detection
 
 # Global flags and path variables
-current_version = "7.6"
+current_version = "7.7"
 TITLE = f"SWBF3 Wii Mod Installer v{current_version}"
 ICON_PATH = 'SWBF3Icon.ico'
 CONFIG_FILE = "mod_installer_config"
@@ -15,8 +15,10 @@ GLOBAL_APPDATA_DIR = ""
 GLOBAL_CUSTOM_APPDATA = False
 GLOBAL_MOD_DIR = ""
 
+GLOBAL_LANGUAGE = "en"  # default language
+
 def load_config(game_dir_entry=None, mod_dir_entry=None, appdata_entry=None):
-    global GLOBAL_GAME_DIR, GLOBAL_MOD_DIR, GLOBAL_APPDATA_DIR, GLOBAL_CUSTOM_APPDATA
+    global GLOBAL_GAME_DIR, GLOBAL_MOD_DIR, GLOBAL_APPDATA_DIR, GLOBAL_CUSTOM_APPDATA, GLOBAL_LANGUAGE
     if not os.path.exists(CONFIG_FILE):
         print_to_console("No configuration file found. Proceeding with default behavior.", "info")
         return
@@ -27,6 +29,7 @@ def load_config(game_dir_entry=None, mod_dir_entry=None, appdata_entry=None):
         GLOBAL_MOD_DIR = config_data.get("mod_dir", "")
         GLOBAL_APPDATA_DIR = config_data.get("appdata_dir", "")
         GLOBAL_CUSTOM_APPDATA = config_data.get("custom_appdata", False)
+        GLOBAL_LANGUAGE = config_data.get("language", "en")  # Now correctly updates the global variable
         if not GLOBAL_CUSTOM_APPDATA or not GLOBAL_APPDATA_DIR:
             GLOBAL_CUSTOM_APPDATA = False
             GLOBAL_APPDATA_DIR = ""
@@ -57,7 +60,8 @@ def save_config():
         "game_dir": GLOBAL_GAME_DIR,
         "mod_dir": GLOBAL_MOD_DIR,
         "appdata_dir": GLOBAL_APPDATA_DIR if GLOBAL_CUSTOM_APPDATA else "",
-        "custom_appdata": GLOBAL_CUSTOM_APPDATA
+        "custom_appdata": GLOBAL_CUSTOM_APPDATA,
+        "language": GLOBAL_LANGUAGE  # NEW: Save language preference
     }
     try:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:

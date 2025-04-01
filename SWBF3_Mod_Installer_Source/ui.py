@@ -4,13 +4,14 @@ import tkinter  # for IntVar and file dialogs
 from PIL import Image
 
 import customtkinter as ctk
+import tkinter  # Ensure tkinter is imported for StringVar and messagebox
+import tkinter.messagebox as messagebox
 from utils import resource_path, log_message, print_to_console
 import config
 from updater import check_for_updates
 from installer import start_install_process, repair_game, uninstall_textures
-
-import webbrowser #April Fools
-
+import json
+import os
 # Global variables for debouncing and progress bar animation
 
 resize_after_id = None
@@ -29,6 +30,88 @@ console_text = None
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
 
+def load_language(lang_code="en"):
+    # Build the path to the languages folder within the mod directory.
+    # Ensure that config.load_config() has been called so that GLOBAL_MOD_DIR is set.
+    languages_folder = os.path.join(config.GLOBAL_MOD_DIR, "languages")
+    json_path = os.path.join(languages_folder, f"{lang_code}.json")
+    try:
+        with open(json_path, "r", encoding="utf-8") as file:
+            return json.load(file)
+    except Exception as e:
+        print(f"Error loading language file from {json_path}: {e}")
+        return {}
+        
+# Example usage:
+lang = load_language()
+#print(lang.get("about", "About"))
+
+def change_language():
+    import config
+    new_lang_code = select_language()  # Let the user choose a language
+    new_lang = load_language(new_lang_code)
+    if not new_lang:
+        messagebox.showerror("Language Error", f"Could not load language: {new_lang_code}")
+        return
+    global lang
+    lang = new_lang
+    config.GLOBAL_LANGUAGE = new_lang_code
+    config.save_config()
+    
+    # Instead of asking for a restart, update the UI:
+    global main_container
+    if main_container is not None:
+        main_container.destroy()  # Remove the old UI
+    # Rebuild the UI with the new language texts:
+    setup_ui()
+
+def select_language():
+    """
+    Displays a simple window for language selection based on the JSON files available
+    in the "languages" folder inside the mod directory.
+    Returns the selected language code.
+    """
+    import config
+    # Build the path to the languages folder inside the mod directory
+    languages_dir = os.path.join(config.GLOBAL_MOD_DIR, "languages")
+    try:
+        files = os.listdir(languages_dir)
+    except Exception as e:
+        print(f"Error reading languages directory: {e}")
+        files = []
+    
+    # Extract language codes (e.g. "en" from "en.json", "german" from "german.json", etc.)
+    language_codes = [f[:-5] for f in files if f.endswith(".json")]
+    if not language_codes:
+        language_codes = ["en"]  # Fallback if no languages are found
+
+    # Create a temporary window for language selection.
+    import customtkinter as ctk
+    import tkinter
+    lang_window = ctk.CTkToplevel()
+    lang_window.title("Select Language")
+    lang_window.geometry("300x150")
+    
+    # Create a StringVar with the first available language as default.
+    selected_lang = tkinter.StringVar(value=language_codes[0])
+    
+    # Create a dropdown menu populated with available language codes.
+    option_menu = ctk.CTkOptionMenu(lang_window, values=language_codes, variable=selected_lang)
+    option_menu.pack(padx=20, pady=20)
+    
+    # Create a confirm button to close the window.
+    def confirm_selection():
+        lang_window.destroy()
+    
+    confirm_button = ctk.CTkButton(lang_window, text="Confirm", command=confirm_selection)
+    confirm_button.pack(padx=20, pady=10)
+    
+    lang_window.grab_set()  # Make the window modal.
+    lang_window.wait_window()
+    
+    return selected_lang.get()
+
+
 
 # ---------------- Utility Functions ----------------
 def toggle_mods(mod_vars, toggle_btn):
@@ -39,12 +122,12 @@ def toggle_mods(mod_vars, toggle_btn):
     if all(var.get() == 1 for var in mod_vars.values()):
         for var in mod_vars.values():
             var.set(0)
-        toggle_btn.configure(text="Select All Mods")
+        toggle_btn.configure(text=lang.get("select_all_mods", "Select All Mods"))
         print_to_console("Deselected all mods.")
     else:
         for var in mod_vars.values():
             var.set(1)
-        toggle_btn.configure(text="Deselect All Mods")
+        toggle_btn.configure(text=lang.get("deselect_all_mods", "Deselect All Mods"))
         print_to_console("Selected all mods.")
 
 
@@ -116,28 +199,15 @@ def show_about():
     about_window.resizable(False, False)
     about_text = ctk.CTkTextbox(about_window, width=580, height=260)
     about_text.pack(padx=10, pady=10)
-    about_text.insert("0.0", """
-Made by BrokenToaster
-Tested with build r2.91120a
+    about_text.insert("0.0", lang.get("about_text", "Default about text..."))
 
-This installer was made for the Free Radical Archive Mods-Wii
-Discord: https://discord.gg/VE6mDWru
-
-The source code for this project is here:
-https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/tree/swbf3_wii_mod_installer_v4.0
-
-Instructions:
-
-Please download the unpacked version of the game for modding.
-Run Dolphin at least once before installing these mods.
-""")
     about_text.configure(state="disabled")
 
 
 # ---------------- Top Panel (with Image on the Left) ----------------
 def setup_top_panel(parent):
     """
-    Top panel with the image on the left and the About button on the right.
+    Top panel with the image on the left and the About and Language buttons on the right.
     """
     top_panel = ctk.CTkFrame(parent)
     top_panel.pack(fill="x", padx=5, pady=5)
@@ -155,8 +225,12 @@ def setup_top_panel(parent):
         image_label = ctk.CTkLabel(top_panel, text="Image Not Available")
         image_label.pack(side="left", padx=5, pady=5)
     
+    # Create the Language button.
+    language_button = ctk.CTkButton(top_panel, text=lang.get("language", "Language"), command=change_language)
+    language_button.pack(side="right", padx=5, pady=5)
+    
     # Pack the About button on the right.
-    about_button = ctk.CTkButton(top_panel, text="About", command=show_about)
+    about_button = ctk.CTkButton(top_panel, text=lang.get("about", "About"), command=show_about)
     about_button.pack(side="right", padx=5, pady=5)
     
     return top_panel
@@ -170,45 +244,30 @@ def setup_directory_frame(parent):
     dir_frame.pack(fill="x", padx=5, pady=5)
 
     # Game Directory.
-    game_dir_label = ctk.CTkLabel(dir_frame, text="Game Directory:")
+    game_dir_label = ctk.CTkLabel(dir_frame, text=lang.get("game_directory", "Game Directory:"))
     game_dir_label.grid(row=0, column=0, sticky="w", padx=5, pady=2)
     game_dir_entry = ctk.CTkEntry(dir_frame)
     game_dir_entry.grid(row=0, column=1, sticky="ew", padx=5, pady=2)
-    browse_game_button = ctk.CTkButton(
-        dir_frame,
-        text="Browse",
-        command=lambda: config.browse_folder(game_dir_entry, "game")
-    )
+    browse_game_button = ctk.CTkButton(dir_frame, text=lang.get("browse", "Browse"), command=lambda: config.browse_folder(game_dir_entry, "game"))
+
     browse_game_button.grid(row=0, column=2, padx=5, pady=2)
 
     # Mod Directory.
-    mod_dir_label = ctk.CTkLabel(dir_frame, text="Mod Directory:")
+    mod_dir_label = ctk.CTkLabel(dir_frame, text=lang.get("mod_directory", "Mod Directory:"))
     mod_dir_label.grid(row=1, column=0, sticky="w", padx=5, pady=2)
     mod_dir_entry = ctk.CTkEntry(dir_frame)
     mod_dir_entry.grid(row=1, column=1, sticky="ew", padx=5, pady=2)
-    browse_mod_button = ctk.CTkButton(
-        dir_frame,
-        text="Browse",
-        command=lambda: config.browse_folder(mod_dir_entry, "mod")
-    )
+    browse_mod_button = ctk.CTkButton(dir_frame, text=lang.get("browse", "Browse"), command=lambda: config.browse_folder(mod_dir_entry, "mod"))
     browse_mod_button.grid(row=1, column=2, padx=5, pady=2)
 
     # AppData Directory.
-    appdata_label = ctk.CTkLabel(dir_frame, text="AppData Directory:")
+    appdata_label = ctk.CTkLabel(dir_frame, text=lang.get("appdata_directory", "AppData Directory:"))
     appdata_label.grid(row=2, column=0, sticky="w", padx=5, pady=2)
     appdata_entry = ctk.CTkEntry(dir_frame)
     appdata_entry.grid(row=2, column=1, sticky="ew", padx=5, pady=2)
-    custom_appdata_button = ctk.CTkButton(
-        dir_frame,
-        text="Custom",
-        command=lambda: config.browse_folder(appdata_entry, "appdata")
-    )
+    custom_appdata_button = ctk.CTkButton(dir_frame, text=lang.get("custom", "Custom"), command=lambda: config.browse_folder(appdata_entry, "appdata"))
     custom_appdata_button.grid(row=2, column=2, padx=5, pady=2)
-    reset_appdata_button = ctk.CTkButton(
-        dir_frame,
-        text="Reset",
-        command=lambda: config.reset_appdata_path(appdata_entry)
-    )
+    reset_appdata_button = ctk.CTkButton(dir_frame, text=lang.get("reset", "Reset"), command=lambda: config.reset_appdata_path(appdata_entry))
     reset_appdata_button.grid(row=2, column=3, padx=5, pady=2)
 
     # Allow the entry column to expand.
@@ -308,12 +367,12 @@ def setup_mod_frame(parent):
     show_frame(texture_frame)
     
     # Below the content area, add a toggle button (optional).
-    toggle_btn = ctk.CTkButton(container, text="Select All Mods",
-                               command=lambda: toggle_mods(mod_vars, toggle_btn))
+    toggle_btn = ctk.CTkButton(container, text=lang.get("select_all_mods", "Select All Mods"), command=lambda: toggle_mods(mod_vars, toggle_btn))
+
     toggle_btn.pack(anchor="w", padx=5, pady=5)
     
     # (Optional) Add a label for additional instructions.
-    custom_texture_label = ctk.CTkLabel(container, text="Enable custom textures in Dolphin")
+    custom_texture_label = ctk.CTkLabel(container, text=lang.get("enable_custom_textures", "Enable custom textures in Dolphin"))
     custom_texture_label.pack(anchor="w", padx=5, pady=5)
     
     return mod_vars
@@ -326,40 +385,17 @@ def setup_actions_frame(parent, mod_vars):
     actions_frame = ctk.CTkFrame(parent)
     actions_frame.pack(fill="x", padx=5, pady=5)
 
-    install_button = ctk.CTkButton(
-        actions_frame,
-        text="Install",
-        command=lambda: start_install_process(mod_vars)
-    )
+    install_button = ctk.CTkButton(actions_frame, text=lang.get("install", "Install"), command=lambda: start_install_process(mod_vars))
     install_button.pack(side="left", expand=True, padx=5, pady=5)
 
-    updates_button = ctk.CTkButton(
-        actions_frame,
-        text="Check for Updates",
-        command=check_for_updates
-    )
+    updates_button = ctk.CTkButton(actions_frame, text=lang.get("check_updates", "Check for Updates"), command=check_for_updates)
     updates_button.pack(side="left", expand=True, padx=5, pady=5)
 
-    repair_button = ctk.CTkButton(
-        actions_frame,
-        text="Repair",
-        command=repair_game_async
-    )
+    repair_button = ctk.CTkButton(actions_frame, text=lang.get("repair", "Repair"), command=repair_game_async)
     repair_button.pack(side="left", expand=True, padx=5, pady=5)
 
-    uninstall_tex_button = ctk.CTkButton(
-        actions_frame,
-        text="Uninstall Texture Mods",
-        command=uninstall_tex_async
-    )
+    uninstall_tex_button = ctk.CTkButton(actions_frame, text=lang.get("uninstall_texture_mods", "Uninstall Texture Mods"), command=uninstall_tex_async)
     uninstall_tex_button.pack(side="left", expand=True, padx=5, pady=5)
-
-    aprilFools_button = ctk.CTkButton(
-        actions_frame,
-        text="Wii to PC Convertion",
-        command=april_fools
-    )
-    aprilFools_button.pack(side="left", expand=True, padx=5, pady=5)
 
     return actions_frame
 
@@ -373,7 +409,7 @@ def setup_console_frame(parent):
     console_frame.grid_rowconfigure(1, weight=1)
     console_frame.grid_columnconfigure(0, weight=1)
 
-    label = ctk.CTkLabel(console_frame, text="Console Output:")
+    label = ctk.CTkLabel(console_frame, text=lang.get("console_output", "Console Output:"))
     label.grid(row=0, column=0, sticky="nw", padx=5, pady=2)
 
     console_text_widget = ctk.CTkTextbox(console_frame)
@@ -429,10 +465,6 @@ def uninstall_tex_async():
     repair_thread = threading.Thread(target=run, daemon=True)
     repair_thread.start()
 
-def april_fools():
-    url = 'https://youtu.be/2qBlE2-WL60?si=7bAHJhMeSZImGS0J'
-    webbrowser.open(url)
-
 def setup_ui():
     """
     Build the main UI using a container with two columns:
@@ -441,7 +473,7 @@ def setup_ui():
       
     In this layout, the left panel occupies 3/4 of the width and the right panel occupies 1/4.
     """
-    # Create a main container frame that fills the root window.
+    global main_container  # declare a global variable for the main container
     main_container = ctk.CTkFrame(root)
     main_container.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
     root.grid_rowconfigure(0, weight=1)
@@ -452,14 +484,14 @@ def setup_ui():
     main_container.grid_columnconfigure(1, weight=1)
     main_container.grid_rowconfigure(0, weight=1)
 
-    # === Create the right panel (Console) first ===
+    # Create the right panel (Console)
     right_panel = ctk.CTkFrame(main_container)
     right_panel.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=5)
     right_panel.grid_rowconfigure(0, weight=1)
     right_panel.grid_columnconfigure(0, weight=1)
     setup_console_frame(right_panel)
-    
-    # === Create the left panel (UI Controls) ===
+
+    # Create the left panel (UI Controls)
     left_panel = ctk.CTkFrame(main_container)
     left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 5), pady=5)
     left_panel.grid_rowconfigure(2, weight=1)
@@ -471,40 +503,12 @@ def setup_ui():
     return mod_vars
 
 
+
 # ---------------- Aliases for Backward Compatibility ----------------
 # Provide aliases so that other modules that import start_loading and stop_loading will
 # get the progress bar functions.
 start_loading = start_progress_bar
 stop_loading = stop_progress_bar
 
-# ---------------- Main Menu (for example) ----------------
-def main_menu():
-    global root
-    root = ctk.CTk()
-    from config import current_version  # Ensure current_version is imported
-    root.title(f"SWBF3 Wii Mod Installer v{current_version}")
-    root.geometry("1530x790")
-    try:
-        import platform
-        if platform.system() == "Windows":
-            root.iconbitmap(resource_path("SWBF3Icon.ico"))
-        else:
-            from tkinter import PhotoImage
-            icon = PhotoImage(file=resource_path("SWBF3Icon.png"))
-            root.iconphoto(False, icon)
-    except Exception as e:
-        print("Error setting icon:", e)
-    
-    # Configure the root grid and launch the UI.
-    root.grid_rowconfigure(0, weight=1)
-    root.grid_rowconfigure(1, weight=0)
-    root.grid_columnconfigure(0, weight=1)
-    root.bind("<Configure>", on_resize)
-    mod_vars = setup_ui()
-    root.mainloop()
-
-
 if __name__ == "__main__":
-    from config import initialize_directories
-    initialize_directories()
-    main_menu()
+    setup_ui()
