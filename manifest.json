@@ -113,6 +113,12 @@
       "version": "1.0",
       "dir": "HD_interface",
       "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/mod_update_v1/HD_interface.zip"
+    },
+    {
+      "name": "Installer_Languages",
+      "version": "1.0",
+      "dir": "languages",
+      "download_url": "https://github.com/MichaelZaugg/SWBF3-Wii-Mod-Installer/releases/download/mod_update_v1/languages.zip"
     }
   ],
 
