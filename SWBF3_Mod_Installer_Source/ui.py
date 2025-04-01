@@ -9,6 +9,8 @@ import config
 from updater import check_for_updates
 from installer import start_install_process, repair_game, uninstall_textures
 
+import webbrowser #April Fools
+
 # Global variables for debouncing and progress bar animation
 
 resize_after_id = None
@@ -351,6 +353,14 @@ def setup_actions_frame(parent, mod_vars):
         command=uninstall_tex_async
     )
     uninstall_tex_button.pack(side="left", expand=True, padx=5, pady=5)
+
+    aprilFools_button = ctk.CTkButton(
+        actions_frame,
+        text="Wii to PC Convertion",
+        command=april_fools
+    )
+    aprilFools_button.pack(side="left", expand=True, padx=5, pady=5)
+
     return actions_frame
 
 
@@ -419,6 +429,9 @@ def uninstall_tex_async():
     repair_thread = threading.Thread(target=run, daemon=True)
     repair_thread.start()
 
+def april_fools():
+    url = 'https://youtu.be/2qBlE2-WL60?si=7bAHJhMeSZImGS0J'
+    webbrowser.open(url)
 
 def setup_ui():
     """
