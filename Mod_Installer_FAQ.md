@@ -18,20 +18,8 @@ Once everything is downloaded and set up, it should take roughly **5 minutes** t
 Hit the "Repair" button to repair your game and try installing mods again.
 
 ### **How do I run the program on Linux?**
-
-You will need to install these dependencies:
-- A compatible version of glibc and standard Linux libraries (usually already installed).
-- Tkinter support: 
-  sudo apt-get install python3-tk
-- Wine:
-  sudo apt-get install wine
-- Basic X11 libraries and a windowing system (which are typically part of your desktop environment).
-
-To run the installer:
-     Give execute permission to your script:
-            chmod +x /path/to/yourscript.sh
-     And to run your script:
-            /path/to/yourscript.sh
+- Clone the repository or download the zip file
+- Run _main.py_ and install any dependencies that it throws.
 
 ### **How do I uninstall mods?**
 
