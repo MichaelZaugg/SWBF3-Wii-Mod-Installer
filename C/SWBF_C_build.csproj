@@ -19,5 +19,6 @@
     <!-- Required by the VS Code previewer loader -->
     <PackageReference Include="Avalonia.Markup.Xaml.Loader" Version="11.2.5" />
     <AvaloniaResource Include="Assets\**" />
+    <PackageReference Include="SharpCompress" Version="0.50.4" />
   </ItemGroup>
 </Project>
