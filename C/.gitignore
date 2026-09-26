@@ -1,0 +1,13 @@
+# Build outputs and intermediate files
+bin/
+obj/
+
+# IDE & Editor settings (VS Code / Visual Studio)
+.vscode/
+.idea/
+*.user
+*.suo
+
+# System generated files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,190 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="450"
+        x:Class="SWBF_C_build.MainWindow"
+        Title="SWBF3 Wii Manager"
+        Icon="avares://SWBF_C_build/Assets/SWBF3Icon.ico"
+        Width="700" Height="450"
+        WindowStartupLocation="CenterScreen"
+        RequestedThemeVariant="Dark">
+
+    <Grid RowDefinitions="Auto, *">
+        <!-- Top Navigation Bar Header -->
+        <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="10,10,10,0">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="15" VerticalAlignment="Center">
+                <Image Source="avares://SWBF_C_build/Assets/SWBF_Wii_Comb.png" 
+                       Height="40" 
+                       Stretch="Uniform"/>
+                <TextBlock Text="SWBF III Wii Manager" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- Game / Build Version Dropdown -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBlock Text="Target Build:" VerticalAlignment="Center" Foreground="#A0A0A0" FontSize="12"/>
+                <ComboBox x:Name="VersionComboBox" SelectedIndex="0" Width="170" VerticalAlignment="Center" SelectionChanged="OnVersionChanged">
+                    <ComboBoxItem>r2.91120a</ComboBoxItem>
+                    <ComboBoxItem>r907-Hybrid</ComboBoxItem>
+                    <ComboBoxItem>r90776a</ComboBoxItem>
+                    <ComboBoxItem>r904-Hybrid</ComboBoxItem>
+                    <ComboBoxItem>r1.90431a</ComboBoxItem>
+                    <ComboBoxItem>r89610</ComboBoxItem>
+                </ComboBox>
+            </StackPanel>
+        </Grid>
+
+        <!-- Main Content View Switcher -->
+        <TabControl Grid.Row="1" Margin="10">
+            
+            <!-- Tab 1: Mods Manager -->
+            <TabItem Header="Mods">
+                <Grid RowDefinitions="*, Auto" Margin="0,10,0,0">
+                    <!-- Main Selection Area -->
+                    <Grid Grid.Row="0" ColumnDefinitions="*, 220" Margin="0,0,0,15">
+                        <!-- Mod List -->
+                        <Border Grid.Column="0" Background="#1E1E1E" CornerRadius="0" Padding="5" Margin="0,0,10,0">
+                            <ListBox x:Name="ModListBox">
+                                <ListBoxItem>KBM Controls - Placeholder</ListBoxItem>
+                                <ListBoxItem>Dantooine Crash Fix - Placeholder</ListBoxItem>
+                                <ListBoxItem>Custom Skyboxes - Placeholder</ListBoxItem>
+                            </ListBox>
+                        </Border>
+
+                        <!-- Details Panel -->
+                        <Border Grid.Column="1" Background="#1E1E1E" CornerRadius="0" Padding="12">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Mod Details" FontWeight="SemiBold" FontSize="14"/>
+                                <Separator Background="#333333" Margin="0,2"/>
+                                <TextBlock x:Name="ModDetailsText" 
+                                           Text="Select a mod from the list to view release notes and download details." 
+                                           TextWrapping="Wrap" 
+                                           Foreground="#A0A0A0" 
+                                           FontSize="12"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- Progress and Actions Bar -->
+                    <StackPanel Grid.Row="1" Spacing="8">
+                        <!-- Progress Bar & Status Text -->
+                        <StackPanel Spacing="2">
+                            <ProgressBar x:Name="InstallProgressBar" Height="12" Value="0" Maximum="100"/>
+                            <TextBlock x:Name="StatusText" Text="Ready" FontSize="12" Foreground="#A0A0A0"/>
+                        </StackPanel>
+
+                        <!-- Buttons Row at the Bottom -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="5">
+                            <Button x:Name="InstallButton"
+                                    Content="Install"
+                                    Padding="16,8"
+                                    Click="OnInstallButtonClick"/>
+
+                            <Button x:Name="RepairButton"
+                                    Content="Repair"
+                                    Padding="16,8"
+                                    Click="OnInstallButtonClick"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- Tab 2: Install Manager -->
+            <TabItem Header="Install">
+                <Grid RowDefinitions="*, Auto" Margin="0,10,0,0">
+                    <!-- Main Selection Area -->
+                    <Grid Grid.Row="0" ColumnDefinitions="*, 220" Margin="0,0,0,15">
+                        <!-- Mod List -->
+                        <Border Grid.Column="0" Background="#1E1E1E" CornerRadius="0" Padding="5" Margin="0,0,10,0">
+                            <ListBox x:Name="Wii_Builds">
+                                <ListBoxItem>KBM Controls - Placeholder</ListBoxItem>
+                                <ListBoxItem>Dantooine Crash Fix - Placeholder</ListBoxItem>
+                                <ListBoxItem>Custom Skyboxes - Placeholder</ListBoxItem>
+                            </ListBox>
+                        </Border>
+
+                        <!-- Details Panel -->
+                        <Border Grid.Column="1" Background="#1E1E1E" CornerRadius="0" Padding="12">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Mod Details" FontWeight="SemiBold" FontSize="14"/>
+                                <Separator Background="#333333" Margin="0,2"/>
+                                <TextBlock x:Name="Wii_Builds_DetailsText" 
+                                           Text="Select a mod from the list to view release notes and download details." 
+                                           TextWrapping="Wrap" 
+                                           Foreground="#A0A0A0" 
+                                           FontSize="12"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- Progress and Actions Bar -->
+                    <StackPanel Grid.Row="1" Spacing="8">
+
+                        <!-- Buttons Row at the Bottom -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="5">
+                            <Button x:Name="Install_Build_Button"
+                                    Content="Install"
+                                    Padding="16,8"
+                                    Click="OnInstallButtonClick"/>
+
+                            <Button x:Name="Repair_Build_Button"
+                                    Content="Repair"
+                                    Padding="16,8"
+                                    Click="OnInstallButtonClick"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- Tab 3: Settings Page -->
+            <TabItem Header="Settings">
+                <!-- ScrollViewer enables smooth scrolling when items exceed vertical window bounds -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10,15,10,10" Spacing="15" MaxWidth="500" HorizontalAlignment="Left">
+                        <TextBlock Text="Version: 8.0" FontSize="16"/>
+                        <TextBlock Text="Directories &amp; Paths" FontSize="16" FontWeight="SemiBold"/>
+                        
+                        <!-- File Directories -->
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="Game Installation Directory:" Foreground="#A0A0A0" FontSize="12"/>
+                            <Grid ColumnDefinitions="*, Auto">
+                                <TextBox Grid.Column="0" x:Name="GamePathTextBox" Watermark="/path/to/SWBF/"/>
+                                <Button Grid.Column="1" Content="Browse..." Margin="8,0,0,0" Click="OnBrowseGamePathClick"/>
+                            </Grid>
+                        </StackPanel>
+
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="Mod Installation Directory:" Foreground="#A0A0A0" FontSize="12"/>
+                            <Grid ColumnDefinitions="*, Auto">
+                                <TextBox Grid.Column="0" x:Name="ModPathTextBox" Watermark="/path/to/mods/"/>
+                                <Button Grid.Column="1" Content="Browse..." Margin="8,0,0,0" Click="OnBrowseModPathClick"/>
+                            </Grid>
+                        </StackPanel>
+
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="Appdata Directory:" Foreground="#A0A0A0" FontSize="12"/>
+                            <Grid ColumnDefinitions="*, Auto">
+                                <TextBox Grid.Column="0" x:Name="AppdataPathTextBox" Watermark="/path/to/appdata/"/>
+                                <Button Grid.Column="1" Content="Browse..." Margin="8,0,0,0" Click="OnBrowseAppdataPathClick"/>
+                            </Grid>
+                        </StackPanel>
+
+                        <Separator Background="#333333" Margin="0,5"/>
+
+                        <TextBlock Text="Updates &amp; Integration" FontSize="16" FontWeight="SemiBold"/>
+                        <CheckBox Content="Automatically check for updates on launch" IsChecked="True"/>
+                        <CheckBox Content="Keep temporary download zip files after installation"/>
+                        <CheckBox Content="Debug/Console Output" IsChecked="True"/>
+
+                        <Button x:Name="UpdateButton"
+                                Content="Check for Updates"
+                                Padding="16,8"
+                                Click="OnInstallButtonClick"/>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+        </TabControl>
+    </Grid>
+</Window>
