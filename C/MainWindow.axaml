@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:SWBF_C_build"
         mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="450"
         x:Class="SWBF_C_build.MainWindow"
         Title="SWBF3 Wii Manager"
@@ -23,14 +24,16 @@
             <!-- Game / Build Version Dropdown -->
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <TextBlock Text="Target Build:" VerticalAlignment="Center" Foreground="#A0A0A0" FontSize="12"/>
-                <ComboBox x:Name="VersionComboBox" SelectedIndex="0" Width="170" VerticalAlignment="Center" SelectionChanged="OnVersionChanged">
-                    <ComboBoxItem>r2.91120a</ComboBoxItem>
-                    <ComboBoxItem>r907-Hybrid</ComboBoxItem>
-                    <ComboBoxItem>r90776a</ComboBoxItem>
-                    <ComboBoxItem>r904-Hybrid</ComboBoxItem>
-                    <ComboBoxItem>r1.90431a</ComboBoxItem>
-                    <ComboBoxItem>r89610</ComboBoxItem>
-                </ComboBox>
+                    <ComboBox x:Name="VersionComboBox" 
+                            Width="200" 
+                            VerticalAlignment="Center" 
+                            SelectionChanged="OnVersionChanged">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate DataType="vm:BuildItem">
+                                <TextBlock Text="{Binding Name}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
             </StackPanel>
         </Grid>
 
@@ -186,7 +189,7 @@
             </TabItem>
 
             <!-- Tab 3: Install Manager -->
-            <TabItem Header="Install">
+            <TabItem Header="Builds">
                 <Grid RowDefinitions="*, Auto" Margin="0,10,0,0">
                     <!-- Main Selection Area -->
                     <Grid Grid.Row="0" ColumnDefinitions="*, 250" Margin="0,0,0,15">

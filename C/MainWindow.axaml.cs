@@ -64,6 +64,13 @@ public partial class MainWindow : Window
                 ModListBox.ItemsSource = _manifest.Mods;
                 ToolListBox.ItemsSource = _manifest.Tools;
                 Wii_Builds.ItemsSource = _manifest.Builds;
+
+                // Populate the dropdown with manifest builds
+                VersionComboBox.ItemsSource = _manifest.Builds;
+                if (_manifest.Builds.Length > 0)
+                {
+                    VersionComboBox.SelectedIndex = 0;
+                }
             }
         }
         catch (Exception ex)
@@ -163,10 +170,15 @@ public partial class MainWindow : Window
                 StatusText.Text = $"Downloading {itemName}...";
                 if (ToolStatusText != null) ToolStatusText.Text = $"Downloading {itemName}...";
 
-                await _downloadService.DownloadAndExtractAsync(downloadUrl, targetDir, progress =>
+                await _downloadService.DownloadAndExtractAsync(downloadUrl, targetDir, (progress, statusMessage) =>
                 {
+                    // Update progress bars
                     InstallProgressBar.Value = progress;
                     if (ToolProgressBar != null) ToolProgressBar.Value = progress;
+
+                    // Update status text labels
+                    StatusText.Text = statusMessage;
+                    if (ToolStatusText != null) ToolStatusText.Text = statusMessage;
                 });
 
                 Console.WriteLine($"[INFO] Successfully installed {itemName}");
@@ -194,10 +206,10 @@ public partial class MainWindow : Window
     {
         if (Design.IsDesignMode || StatusText == null) return;
 
-        if (VersionComboBox?.SelectedItem is ComboBoxItem selectedItem)
+        if (VersionComboBox?.SelectedItem is BuildItem selectedBuild)
         {
-            StatusText.Text = $"Switched build target to {selectedItem.Content}";
-            Console.WriteLine($"[INFO] Target build changed to: {selectedItem.Content}");
+            StatusText.Text = $"Switched build target to {selectedBuild.Name}";
+            Console.WriteLine($"[INFO] Target build changed to: {selectedBuild.Name}");
         }
     }
 

@@ -1,5 +1,6 @@
 // Models.cs
 using System;
+using System.Collections.Generic;
 
 namespace SWBF_C_build;
 
@@ -48,6 +49,7 @@ public class BuildItem
     public string Description { get; set; } = "";
     public string DownloadUrl { get; set; } = "";
     public string Size { get; set; } = "";
+
     public long SizeBytes { get; set; } = 0;
 
     public string DisplaySize => !string.IsNullOrWhiteSpace(Size) 
@@ -56,6 +58,11 @@ public class BuildItem
 
     public override string ToString() => 
         string.IsNullOrEmpty(DisplaySize) ? Name : $"{Name} ({DisplaySize})";
+
+    public static List<BuildItem> SampleBuilds { get; } = new()
+    {
+        new BuildItem { Name = "Sample Build" }
+    };
 }
 
 public class ModItem
