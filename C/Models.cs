@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace SWBF_C_build;
 
@@ -29,13 +30,11 @@ public static class FileSizeFormatter
 
 public class AppConfig
 {
-    public string GameDir { get; set; } = "";
-    public string ModDir { get; set; } = "";
-    public string AppDataDir { get; set; } = "";
-    public bool LoadCustomTextures { get; set; } = true;
-    
-    // Tracks what is currently installed: Key = Item Name, Value = Version
-    public Dictionary<string, string> InstalledVersions { get; set; } = new();
+    public string BuildsDir { get; set; } = ""; //[cite: 3]
+    public string ModDir { get; set; } = ""; //[cite: 3]
+    public string AppDataDir { get; set; } = ""; //[cite: 3]
+    public bool LoadCustomTextures { get; set; } = true; //[cite: 3]
+    public Dictionary<string, string> InstalledVersions { get; set; } = new(); //[cite: 3]
 }
 
 public static class ConfigManager
@@ -66,15 +65,36 @@ public static class ConfigManager
         }
         catch (Exception ex) { Console.Error.WriteLine($"[ERROR] Failed to save config: {ex.Message}"); }
     }
+
+    public static void Delete()
+    {
+        if (File.Exists(ConfigPath))
+        {
+            File.Delete(ConfigPath);
+        }
+    }
+}
+
+public class InstallerInfo
+{
+    [JsonPropertyName("version")]
+    public string Version { get; set; } = "1.0";
+
+    [JsonPropertyName("download_url")]
+    public string DownloadUrl { get; set; } = "";
+
+    [JsonPropertyName("download_url_linux")]
+    public string DownloadUrlLinux { get; set; } = "";
 }
 
 public class AppManifest
 {
-    public string BaseUrl { get; set; } = "";
-    public string LatestInstallerVersion { get; set; } = "1.0.0";
-    public BuildItem[] Builds { get; set; } = Array.Empty<BuildItem>();
-    public ModItem[] Mods { get; set; } = Array.Empty<ModItem>();
-    public ToolItem[] Tools { get; set; } = Array.Empty<ToolItem>();
+    public string BaseUrl { get; set; } = ""; //[cite: 3]
+    public string LatestInstallerVersion { get; set; } = "1.0.0"; //[cite: 3]
+    public InstallerInfo Installer { get; set; } = new(); 
+    public BuildItem[] Builds { get; set; } = Array.Empty<BuildItem>(); //[cite: 3]
+    public ModItem[] Mods { get; set; } = Array.Empty<ModItem>(); //[cite: 3]
+    public ToolItem[] Tools { get; set; } = Array.Empty<ToolItem>(); //[cite: 3]
 }
 
 // Base class to handle UI updates for installation status
@@ -139,6 +159,8 @@ public class ModItem : InstallableItem
 
     public string DisplaySize => !string.IsNullOrWhiteSpace(Size) ? Size : FileSizeFormatter.FormatBytes(SizeBytes);
     public override string ToString() => string.IsNullOrEmpty(DisplaySize) ? Name : $"{Name} ({DisplaySize})";
+    public string Category { get; set; } = "Uncategorized";
+    public string Build { get; set; } = "all";
 }
 
 public class ToolItem : InstallableItem
@@ -153,4 +175,10 @@ public class ToolItem : InstallableItem
 
     public string DisplaySize => !string.IsNullOrWhiteSpace(Size) ? Size : FileSizeFormatter.FormatBytes(SizeBytes);
     public override string ToString() => string.IsNullOrEmpty(DisplaySize) ? Name : $"{Name} ({DisplaySize})";
+}
+
+public class ModGroupHeader
+{
+    public string Title { get; }
+    public ModGroupHeader(string title) => Title = title;
 }
