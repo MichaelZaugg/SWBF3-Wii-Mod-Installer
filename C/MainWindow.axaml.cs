@@ -1,612 +1,721 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
-using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using SWBF_C_build.Services;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Threading.Tasks;
-using SWBF_C_build.Services;
 
 namespace SWBF_C_build;
 
 public partial class MainWindow : Window
 {
-    private readonly DownloadService _downloadService = new DownloadService();
-    private AppManifest? _manifest;
-    private AppConfig _config; 
-    private const string CurrentAppVersion = "8.0"; 
+    private AppManifest _manifest;
+    private DownloadService _downloadService;
 
-    private bool IsDebugEnabled => DebugCheckBox?.IsChecked ?? true;
+    // Central Dolphin and Tools directories, sitting alongside the executable
+    private static readonly string GlobalDolphinDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Dolphin");
+    private static readonly string GlobalToolsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools");
+
+    // Active build filter on the Play/Mods tab. null = show every mod.
+    private string? _activeBuildFilter;
 
     public MainWindow()
     {
         InitializeComponent();
-        SetupConsoleRedirection();
+
+        // Mirror Console output (installer logs, Dolphin output, config warnings) into the Debug/Console panel
+        Console.SetOut(new ConsoleRedirector(Console.Out, AppendToDebugConsole));
+        Console.SetError(new ConsoleRedirector(Console.Error, AppendToDebugConsole));
+
+        _downloadService = new DownloadService();
+        _manifest = new AppManifest();
+
+        // Resolve the general mods folder (next to Builds) and show saved paths in the Settings tab
+        var startupConfig = ConfigManager.Load();
+        if (string.IsNullOrWhiteSpace(startupConfig.ModDir))
+        {
+            startupConfig.ModDir = ConfigManager.GetGeneralModsDir(startupConfig);
+            ConfigManager.Save(startupConfig);
+        }
+        BuildsPathTextBox.Text = startupConfig.BuildsDir;
+        ModPathTextBox.Text = startupConfig.ModDir;
+        AppdataPathTextBox.Text = startupConfig.AppDataDir;
         
-        // Load the persistent config on startup
-        _config = ConfigManager.Load();
-        
-        InitializeData();
+        // Load manifest from server and populate UI
+        _ = InitializeAppAsync();
     }
 
-    private void SetupConsoleRedirection()
-    {
-        var redirectedOut = new ConsoleRedirector(Console.Out, LogToDebugConsole);
-        var redirectedError = new ConsoleRedirector(Console.Error, LogToDebugConsole);
+    // ───────────────────────── Debug console ─────────────────────────
 
-        Console.SetOut(redirectedOut);
-        Console.SetError(redirectedError);
+    // Keep the log bounded; Dolphin can print a lot
+    private const int MaxDebugConsoleChars = 200_000;
+
+    /// <summary>Appends text to the Debug/Console panel and scrolls to the end. Called on the UI thread.</summary>
+    private void AppendToDebugConsole(string text)
+    {
+        string current = (DebugConsoleTextBox.Text ?? "") + text;
+        if (current.Length > MaxDebugConsoleChars)
+            current = current[^MaxDebugConsoleChars..];
+
+        DebugConsoleTextBox.Text = current;
+        DebugConsoleTextBox.CaretIndex = current.Length;
     }
 
-    private void LogToDebugConsole(string message)
+    // ───────────────────────── Install status ─────────────────────────
+
+    private static string ItemKey(string id, string name) => !string.IsNullOrEmpty(id) ? id : name;
+
+    /// <summary>
+    /// Universal mods are tracked once ("<id>"); build-specific mods are tracked per build ("<tag>/<id>").
+    /// </summary>
+    private static string ModConfigKey(ModItem mod, string? buildTag) =>
+        mod.IsUniversal || string.IsNullOrEmpty(buildTag)
+            ? ItemKey(mod.Id, mod.Name)
+            : $"{buildTag}/{ItemKey(mod.Id, mod.Name)}";
+
+    private string? CurrentTargetTag => (VersionComboBox.SelectedItem as BuildItem)?.Tag;
+
+    private void UpdateInstallationStatuses()
     {
-        if (IsDebugEnabled && DebugConsoleTextBox != null)
-        {
-            DebugConsoleTextBox.Text += message;
-            DebugConsoleTextBox.CaretIndex = DebugConsoleTextBox.Text.Length;
-        }
-    }
-
-    private async void InitializeData()
-    {
-        BuildsPathTextBox.Text = _config.BuildsDir;
-        ModPathTextBox.Text = _config.ModDir;
-        AppdataPathTextBox.Text = !string.IsNullOrEmpty(_config.AppDataDir) ? _config.AppDataDir : InstallerUtils.DetectDolphinAppData();
-
-        BuildsPathTextBox.TextChanged += (s, e) => { _config.BuildsDir = BuildsPathTextBox.Text ?? ""; ConfigManager.Save(_config); };
-        ModPathTextBox.TextChanged += (s, e) => { _config.ModDir = ModPathTextBox.Text ?? ""; ConfigManager.Save(_config); };
-        AppdataPathTextBox.TextChanged += (s, e) => { _config.AppDataDir = AppdataPathTextBox.Text ?? ""; ConfigManager.Save(_config); };
-
-        string manifestUrl = "http://192.168.0.100:8881/manifest.json";
-        
-        try
-        {
-            using var client = new HttpClient();
-            string json = await client.GetStringAsync(manifestUrl);
-            
-            _manifest = System.Text.Json.JsonSerializer.Deserialize<AppManifest>(json, new System.Text.Json.JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-                NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString
-            });
-
-            if (_manifest != null)
-            {
-                await CheckForUpdates();
-
-                EvaluateInstallStatus(_manifest.Mods);
-                EvaluateInstallStatus(_manifest.Tools);
-                EvaluateInstallStatus(_manifest.Builds);
-
-                UpdateModList();
-                ToolListBox.ItemsSource = _manifest.Tools;
-                Wii_Builds.ItemsSource = _manifest.Builds;
-
-                foreach (var build in _manifest.Builds)
-                {
-                    build.PropertyChanged += (s, e) =>
-                    {
-                        if (e.PropertyName == nameof(BuildItem.InstallStatus))
-                        {
-                            Dispatcher.UIThread.Post(UpdateBuildDropdown);
-                        }
-                    };
-                }
-
-                UpdateBuildDropdown();
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[ERROR] Failed to load manifest from server: {ex.Message}");
-        }
-
-        ModListBox.SelectionChanged += OnModSelectionChanged;
-        ToolListBox.SelectionChanged += OnToolSelectionChanged;
-        Wii_Builds.SelectionChanged += OnBuildSelectionChanged;
-
-        Console.WriteLine("[INFO] Initialization complete.");
-    }
-
-    private async Task CheckForUpdates()
-    {
-        if (_manifest?.Installer != null && _manifest.Installer.Version != CurrentAppVersion)
-        {
-            StatusText.Text = $"Update available: v{_manifest.Installer.Version}. Downloading update...";
-            string downloadUrl = RuntimeInformation.IsOSPlatform(OSPlatform.Linux) 
-                ? _manifest.Installer.DownloadUrlLinux 
-                : _manifest.Installer.DownloadUrl;
-            
-            string exeName = AppDomain.CurrentDomain.FriendlyName;
-            string newExePath = Path.Combine(AppContext.BaseDirectory, $"new_{exeName}");
-            
-            using var client = new HttpClient();
-            var bytes = await client.GetByteArrayAsync(downloadUrl);
-            await File.WriteAllBytesAsync(newExePath, bytes);
-
-            StatusText.Text = "Update downloaded. Restarting...";
-            
-            string scriptName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "update.bat" : "update.sh";
-            string scriptPath = Path.Combine(AppContext.BaseDirectory, scriptName);
-            
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                File.WriteAllText(scriptPath, $"timeout /t 2\ndel \"{exeName}\"\nren \"new_{exeName}\" \"{exeName}\"\nstart \"\" \"{exeName}\"\ndel update.bat");
-            }
-            else
-            {
-                File.WriteAllText(scriptPath, $"sleep 2\nrm \"{exeName}\"\nmv \"new_{exeName}\" \"{exeName}\"\nchmod +x \"{exeName}\"\n./\"{exeName}\" &\nrm update.sh");
-                await InstallerUtils.RunBatchScriptAsync(AppContext.BaseDirectory, $"chmod +x {scriptName}"); 
-            }
-
-            Process.Start(new ProcessStartInfo { FileName = scriptPath, UseShellExecute = true, CreateNoWindow = true });
-            Environment.Exit(0);
-        }
-    }
-
-    private void EvaluateInstallStatus(IEnumerable<InstallableItem> items)
-    {
-        foreach (var item in items)
-        {
-            if (_config.InstalledVersions.TryGetValue(item.Name, out string? installedVersion))
-            {
-                if (installedVersion != item.Version)
-                {
-                    item.InstallStatus = "Update";
-                }
-                else
-                {
-                    item.InstallStatus = "Installed";
-                }
-            }
-            else
-            {
-                item.InstallStatus = "Not Installed";
-            }
-        }
-    }
-
-    private void MarkAsInstalledAndSave(InstallableItem item)
-    {
-        item.InstallStatus = "Installed";
-        _config.InstalledVersions[item.Name] = item.Version;
-        ConfigManager.Save(_config);
-    }
-
-    private void OnFilterToggleChanged(object? sender, RoutedEventArgs e)
-    {
-        UpdateModList();
-    }
-
-    private string GetCompatibilityTagForBuild(string buildName)
-    {
-        if (string.IsNullOrEmpty(buildName)) return "all";
-        
-        if (buildName.Contains("r2.91120a") || buildName.Contains("r91120a")) return "r911";
-        if (buildName.Contains("Hybrid r904")) return "r904-Hybrid";
-        if (buildName.Contains("r1.90431a") || buildName.Contains("r904")) return "r904";
-        
-        return "all"; 
-    }
-
-    private void UpdateModList()
-    {
-        if (_manifest == null || _manifest.Mods == null) return;
-
-        bool filterCompatible = CompatibilityFilterToggle?.IsChecked ?? true;
-        string targetTag = "all";
-        
-        if (filterCompatible && VersionComboBox?.SelectedItem is BuildItem selectedBuild)
-        {
-            targetTag = GetCompatibilityTagForBuild(selectedBuild.Name);
-        }
-
-        var filteredMods = _manifest.Mods.AsEnumerable();
-        if (filterCompatible && targetTag != "all")
-        {
-            filteredMods = filteredMods.Where(m => 
-                string.Equals(m.Build, "all", StringComparison.OrdinalIgnoreCase) || 
-                string.Equals(m.Build, targetTag, StringComparison.OrdinalIgnoreCase));
-        }
-
-        var listItems = new List<object>();
-
-        var groupedMods = filteredMods
-            .GroupBy(m => !string.IsNullOrWhiteSpace(m.Category) ? m.Category : "Uncategorized")
-            .OrderBy(g => g.Key);
-
-        foreach (var group in groupedMods)
-        {
-            listItems.Add(new BuildGroupHeader($"=== {group.Key} ==="));
-            listItems.AddRange(group);
-        }
-
-        if (ModListBox != null)
-        {
-            ModListBox.ItemsSource = listItems;
-        }
-    }
-
-    private void OnModSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (ModListBox.SelectedItems != null)
-        {
-            var selectedHeaders = ModListBox.SelectedItems.OfType<BuildGroupHeader>().ToList();
-            if (selectedHeaders.Any())
-            {
-                Dispatcher.UIThread.Post(() =>
-                {
-                    foreach (var header in selectedHeaders)
-                    {
-                        ModListBox.SelectedItems.Remove(header);
-                    }
-                });
-            }
-        }
-
-        var newlySelectedMod = e.AddedItems.OfType<ModItem>().FirstOrDefault();
-        if (newlySelectedMod != null)
-        {
-            ModDetailsText.Text = $"{newlySelectedMod.Name}\nSize: {newlySelectedMod.DisplaySize}\n\n{newlySelectedMod.Description}";
-            Console.WriteLine($"[DEBUG] Selected Mod: {newlySelectedMod.Name}");
-        }
-        else
-        {
-            var unselectedMod = e.RemovedItems.OfType<ModItem>().FirstOrDefault();
-            if (unselectedMod != null)
-            {
-                Console.WriteLine($"[DEBUG] Deselected Mod: {unselectedMod.Name}");
-                var remainingMod = ModListBox.SelectedItems?.OfType<ModItem>().FirstOrDefault();
-                if (remainingMod != null)
-                {
-                    ModDetailsText.Text = $"{remainingMod.Name}\nSize: {remainingMod.DisplaySize}\n\n{remainingMod.Description}";
-                }
-                else
-                {
-                    ModDetailsText.Text = "Select a mod from the list to view release notes and download details.";
-                }
-            }
-        }
-    }
-
-    private void OnToolSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (ToolListBox.SelectedItem is ToolItem selectedTool)
-        {
-            ToolDetailsText.Text = $"{selectedTool.Name}\nSize: {selectedTool.DisplaySize}\n\n{selectedTool.Description}";
-            Console.WriteLine($"[DEBUG] Selected Tool: {selectedTool.Name}");
-        }
-    }
-
-    private void OnBuildSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (Wii_Builds.SelectedItem is BuildItem selectedBuild)
-        {
-            Wii_Builds_DetailsText.Text = $"{selectedBuild.Name}\nSize: {selectedBuild.DisplaySize}\n\n{selectedBuild.Description}";
-            Console.WriteLine($"[DEBUG] Selected Build: {selectedBuild.Name}");
-        }
-    }
-
-    private async void OnInstallButtonClick(object? sender, RoutedEventArgs e)
-    {
-        SetActionButtonsEnabled(false);
-        
-        if (StatusText != null) StatusText.Text = "Starting installation...";
-
-        try
-        {
-            // 1. Mods Tab (Play / Install Button)
-            if (sender == InstallButton || sender == PlayButton)
-            {
-                bool installedSomething = false;
-
-                // --- A. Handle Target Build Installation ---
-                if (VersionComboBox?.SelectedItem is BuildItem targetBuild && targetBuild.InstallStatus != "Installed")
-                {
-                    if (StatusText != null) StatusText.Text = $"Installing required build: {targetBuild.Name}...";
-
-                    if (string.IsNullOrWhiteSpace(BuildsPathTextBox.Text))
-                    {
-                        var topLevel = TopLevel.GetTopLevel(this);
-                        if (topLevel == null) 
-                        {
-                            if (StatusText != null) StatusText.Text = "Error: Cannot open folder picker.";
-                            return;
-                        }
-
-                        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-                        {
-                            Title = "Select Builds Directory",
-                            AllowMultiple = false
-                        });
-
-                        if (folders.Count == 0) 
-                        {
-                            if (StatusText != null) StatusText.Text = "Installation cancelled. Builds directory required to install the target build.";
-                            return; 
-                        }
-
-                        BuildsPathTextBox.Text = folders[0].Path.LocalPath;
-                    }
-
-                    string buildTargetDir = BuildsPathTextBox.Text;
-                    string buildDownloadUrl = !string.IsNullOrEmpty(targetBuild.DownloadUrl) 
-                        ? targetBuild.DownloadUrl : $"{_manifest?.BaseUrl}{targetBuild.Url}";
-
-                    await InstallSingleItemAsync(targetBuild.Name, buildDownloadUrl, buildTargetDir, InstallProgressBar, StatusText);
-                    MarkAsInstalledAndSave(targetBuild);
-                    installedSomething = true;
-                }
-
-                // --- B. Handle Mod Installations ---
-                if (ModListBox.SelectedItems != null && ModListBox.SelectedItems.Count > 0)
-                {
-                    if (string.IsNullOrWhiteSpace(ModPathTextBox.Text))
-                    {
-                        var topLevel = TopLevel.GetTopLevel(this);
-                        if (topLevel == null) 
-                        {
-                            if (StatusText != null) StatusText.Text = "Error: Cannot open folder picker.";
-                            return;
-                        }
-                        
-                        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-                        {
-                            Title = "Select Mod Directory",
-                            AllowMultiple = false
-                        });
-                        
-                        if (folders.Count == 0)
-                        {
-                            if (StatusText != null) StatusText.Text = "Installation cancelled. Mod directory required.";
-                            return;
-                        }
-                        
-                        ModPathTextBox.Text = folders[0].Path.LocalPath;
-                    }
-                    
-                    string modTargetDir = ModPathTextBox.Text;
-
-                    foreach (var selected in ModListBox.SelectedItems)
-                    {
-                        if (selected is ModItem mod)
-                        {
-                            string downloadUrl = !string.IsNullOrEmpty(mod.DownloadUrl) 
-                                ? mod.DownloadUrl : $"{_manifest?.BaseUrl}{mod.Url}";
-
-                            await InstallSingleItemAsync(mod.Name, downloadUrl, modTargetDir, InstallProgressBar, StatusText);
-                            MarkAsInstalledAndSave(mod);
-                            installedSomething = true;
-                        }
-                    }
-                }
-
-                if (installedSomething)
-                {
-                    if (StatusText != null) StatusText.Text = "Installation process completed successfully!";
-                }
-                else
-                {
-                    if (StatusText != null) StatusText.Text = "Target build is already installed and no mods were selected.";
-                }
-            }
-            
-            // 2. Tools (Single Select)
-            else if (sender == InstallToolButton || sender == RepairToolButton)
-            {
-                if (ToolListBox.SelectedItem is ToolItem tool)
-                {
-                    string targetDir = Path.Combine(AppContext.BaseDirectory, "Tools");
-                        
-                    string downloadUrl = !string.IsNullOrEmpty(tool.DownloadUrl) 
-                        ? tool.DownloadUrl : $"{_manifest?.BaseUrl}{tool.Url}";
-
-                    await InstallSingleItemAsync(tool.Name, downloadUrl, targetDir, ToolProgressBar, ToolStatusText);
-                    MarkAsInstalledAndSave(tool);
-                    
-                    if (ToolStatusText != null) ToolStatusText.Text = $"{tool.Name} installed successfully!";
-                }
-                else
-                {
-                    if (ToolStatusText != null) ToolStatusText.Text = "Please select a tool to install.";
-                }
-            }
-            
-            // 3. Builds (Single Select)
-            else if (sender == Install_Build_Button || sender == Repair_Build_Button)
-            {
-                if (Wii_Builds.SelectedItem is BuildItem build)
-                {
-                    if (string.IsNullOrWhiteSpace(BuildsPathTextBox.Text))
-                    {
-                        var topLevel = TopLevel.GetTopLevel(this);
-                        if (topLevel == null) 
-                        {
-                            if (BuildsStatusText != null) BuildsStatusText.Text = "Error: Cannot open folder picker.";
-                            return;
-                        }
-
-                        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-                        {
-                            Title = "Select Builds Directory",
-                            AllowMultiple = false
-                        });
-
-                        if (folders.Count == 0) 
-                        {
-                            if (BuildsStatusText != null) BuildsStatusText.Text = "Installation cancelled. Builds directory required.";
-                            return; 
-                        }
-
-                        BuildsPathTextBox.Text = folders[0].Path.LocalPath;
-                    }
-                    
-                    string targetDir = BuildsPathTextBox.Text;
-                        
-                    string downloadUrl = !string.IsNullOrEmpty(build.DownloadUrl) 
-                        ? build.DownloadUrl : $"{_manifest?.BaseUrl}{build.Url}";
-
-                    await InstallSingleItemAsync(build.Name, downloadUrl, targetDir, BuildsProgressBar, BuildsStatusText);
-                    MarkAsInstalledAndSave(build);
-                    
-                    if (BuildsStatusText != null) BuildsStatusText.Text = $"{build.Name} installed successfully!";
-                }
-                else
-                {
-                    if (BuildsStatusText != null) BuildsStatusText.Text = "Please select a build to install.";
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            if (StatusText != null) StatusText.Text = $"Error: {ex.Message}";
-            Console.Error.WriteLine($"[ERROR] Installation failed: {ex.Message}");
-        }
-        finally
-        {
-            SetActionButtonsEnabled(true);
-        }
-    }
-
-    private async Task InstallSingleItemAsync(string itemName, string downloadUrl, string targetDir, ProgressBar? progressBar, TextBlock? statusControl)
-    {
-        Directory.CreateDirectory(targetDir);
-        Console.WriteLine($"[DEBUG] Target installation directory: {targetDir}");
-        Console.WriteLine($"[DEBUG] Starting download for: {itemName} ({downloadUrl})");
-
-        if (statusControl != null) statusControl.Text = $"Downloading {itemName}...";
-        if (progressBar != null) progressBar.Value = 0;
-
-        await _downloadService.DownloadAndExtractAsync(downloadUrl, targetDir, (progress, statusMessage) =>
-        {
-            if (progressBar != null) progressBar.Value = progress;
-            if (statusControl != null) statusControl.Text = statusMessage;
-        });
-
-        Console.WriteLine($"[INFO] Successfully installed {itemName}");
-    }
-
-    private void OnVersionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (Design.IsDesignMode || StatusText == null) return;
-
-        if (VersionComboBox?.SelectedItem is BuildGroupHeader)
-        {
-            Dispatcher.UIThread.Post(() =>
-            {
-                var validItem = e.RemovedItems.Count > 0 ? e.RemovedItems[0] : null;
-                if (validItem is BuildItem)
-                {
-                    VersionComboBox.SelectedItem = validItem;
-                }
-                else if (VersionComboBox.ItemsSource is List<object> items)
-                {
-                    VersionComboBox.SelectedItem = items.FirstOrDefault(x => x is BuildItem);
-                }
-            });
-            return;
-        }
-
-        if (VersionComboBox?.SelectedItem is BuildItem selectedBuild)
-        {
-            StatusText.Text = $"Switched build target to {selectedBuild.Name}";
-            Console.WriteLine($"[INFO] Target build changed to: {selectedBuild.Name}");
-            
-            // Refresh the mods list to reflect the new target build's compatibility
-            UpdateModList(); 
-        }
-    }
-
-    private async void OnBrowseBuildsPathClick(object? sender, RoutedEventArgs e) => await PickFolderAndSetPathAsync(BuildsPathTextBox, "Select Builds Directory");
-    private async void OnBrowseModPathClick(object? sender, RoutedEventArgs e) => await PickFolderAndSetPathAsync(ModPathTextBox, "Select Mod Directory");
-    private async void OnBrowseAppdataPathClick(object? sender, RoutedEventArgs e) => await PickFolderAndSetPathAsync(AppdataPathTextBox, "Select AppData Directory");
-
-    private async Task PickFolderAndSetPathAsync(TextBox targetTextBox, string title)
-    {
-        var topLevel = TopLevel.GetTopLevel(this);
-        if (topLevel == null) return;
-
-        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-        {
-            Title = title,
-            AllowMultiple = false
-        });
-
-        if (folders.Count > 0)
-        {
-            targetTextBox.Text = folders[0].Path.LocalPath;
-            Console.WriteLine($"[DEBUG] Directory path set for '{title}': {targetTextBox.Text}");
-        }
-    }
-
-    private void SetActionButtonsEnabled(bool isEnabled)
-    {
-        if (InstallButton != null) InstallButton.IsEnabled = isEnabled;
-        if (PlayButton != null) PlayButton.IsEnabled = isEnabled;
-        if (InstallToolButton != null) InstallToolButton.IsEnabled = isEnabled;
-        if (RepairToolButton != null) RepairToolButton.IsEnabled = isEnabled;
-        if (Install_Build_Button != null) Install_Build_Button.IsEnabled = isEnabled;
-        if (Repair_Build_Button != null) Repair_Build_Button.IsEnabled = isEnabled;
-        if (UpdateButton != null) UpdateButton.IsEnabled = isEnabled;
-    }
-
-    private void UpdateBuildDropdown()
-    {
-        if (_manifest == null || _manifest.Builds == null) return;
-
-        var comboItems = new List<object>();
-        var installed = new List<BuildItem>();
-        var notInstalled = new List<BuildItem>();
+        var config = ConfigManager.Load();
 
         foreach (var build in _manifest.Builds)
         {
-            if (build.InstallStatus == "Installed" || build.InstallStatus == "Update") installed.Add(build);
-            else notInstalled.Add(build);
+            build.InstallStatus =
+                config.InstalledBuilds.TryGetValue(build.Tag, out var paths) && File.Exists(paths.MainDolPath)
+                    ? "Installed"
+                    : "Not Installed";
         }
 
-        if (installed.Count > 0)
+        UpdateModStatuses(config);
+
+        foreach (var tool in _manifest.Tools)
         {
-            comboItems.Add(new BuildGroupHeader("=== Installed ==="));
-            comboItems.AddRange(installed);
+            tool.InstallStatus = config.InstalledVersions.ContainsKey(ItemKey(tool.Id, tool.Name))
+                ? "Installed"
+                : "Not Installed";
         }
-        else 
+    }
+
+    /// <summary>
+    /// Mod status is relative to the current target build: build-specific mods show whether
+    /// they're installed into that build, or that they don't apply to it.
+    /// </summary>
+    private void UpdateModStatuses(AppConfig config)
+    {
+        string? targetTag = CurrentTargetTag;
+
+        foreach (var mod in _manifest.Mods)
         {
-            comboItems.Add(new BuildItem { Name = "No Builds Installed", InstallStatus = "None" }); 
+            if (mod.IsUniversal)
+            {
+                // Texture-only mods are tracked once; ones that change game files are tracked per build
+                string id = ItemKey(mod.Id, mod.Name);
+                bool installed = config.InstalledVersions.ContainsKey(id)
+                                 || (targetTag != null && config.InstalledVersions.ContainsKey($"{targetTag}/{id}"));
+                mod.InstallStatus = installed ? "Installed" : "Not Installed";
+            }
+            else if (targetTag == null || !mod.IsCompatibleWith(targetTag))
+            {
+                mod.InstallStatus = targetTag == null ? "Not Installed" : $"Not for {targetTag}";
+            }
+            else
+            {
+                mod.InstallStatus = config.InstalledVersions.ContainsKey(ModConfigKey(mod, targetTag))
+                    ? "Installed" : "Not Installed";
+            }
+        }
+    }
+
+    // ───────────────────────── Startup ─────────────────────────
+
+    private async Task InitializeAppAsync()
+    {
+        try
+        {
+            Dispatcher.UIThread.Post(() => StatusText.Text = "Fetching manifest from server...");
+
+            // Fetch manifest from the server
+            using var client = new HttpClient();
+            string manifestUrl = "http://192.168.0.100:8881/manifest.json";
+            
+            string json = await client.GetStringAsync(manifestUrl);
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            _manifest = JsonSerializer.Deserialize<AppManifest>(json, options) ?? new AppManifest();
+
+            // Append the BaseUrl to all item URLs
+            _manifest.BuildFullUrls();
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                WizardBuildComboBox.ItemsSource = _manifest.Builds;
+                Wii_Builds.ItemsSource = _manifest.Builds;
+                ToolListBox.ItemsSource = _manifest.Tools;
+
+                // Group the Build ComboBox to satisfy the XAML DataTemplate
+                var buildList = new List<object> { new BuildGroupHeader("Available Builds") };
+                buildList.AddRange(_manifest.Builds);
+                VersionComboBox.ItemsSource = buildList;
+
+                // Filter buttons must exist before a target build is selected
+                CreateBuildFilterButtons();
+
+                // Check file system and config to set item status
+                UpdateInstallationStatuses();
+
+                if (_manifest.Builds.Any())
+                {
+                    WizardBuildComboBox.SelectedIndex = 0;
+
+                    // Default the target to the first installed build, otherwise the first build
+                    var config = ConfigManager.Load();
+                    var firstInstalled = _manifest.Builds.FirstOrDefault(b => config.InstalledBuilds.ContainsKey(b.Tag));
+                    VersionComboBox.SelectedItem = firstInstalled ?? _manifest.Builds[0];
+                }
+
+                // Bind SelectionChanged events to update the details/description text blocks
+                ModListBox.SelectionChanged += (s, e) =>
+                {
+                    var selected = ModListBox.SelectedItems?.Cast<object>().OfType<ModItem>().FirstOrDefault();
+                    ModDetailsText.Text = selected?.Description ?? "Select a mod from the list to view release notes and download details.";
+                };
+                
+                ToolListBox.SelectionChanged += (s, e) =>
+                {
+                    var selected = ToolListBox.SelectedItem as ToolItem;
+                    ToolDetailsText.Text = selected?.Description ?? "Select a tool from the list to view release notes and download details.";
+                };
+                
+                Wii_Builds.SelectionChanged += (s, e) =>
+                {
+                    var selected = Wii_Builds.SelectedItem as BuildItem;
+                    Wii_Builds_DetailsText.Text = selected?.Description ?? "Select a build from the list to view release notes and download details.";
+                };
+
+                RefreshModList();
+                StatusText.Text = "Ready";
+            });
+        }
+        catch (HttpRequestException ex)
+        {
+            Dispatcher.UIThread.Post(() => StatusText.Text = $"Network Error: Could not reach manifest server. ({ex.Message})");
+        }
+        catch (Exception ex)
+        {
+            Dispatcher.UIThread.Post(() => StatusText.Text = $"Failed to parse manifest: {ex.Message}");
+        }
+    }
+
+    // ───────────────────────── Build filter ─────────────────────────
+
+    private void CreateBuildFilterButtons()
+    {
+        BuildFilterPanel.Children.Clear();
+        AddFilterButton("All", null, "Show every mod");
+
+        foreach (var build in _manifest.Builds.GroupBy(b => b.Tag).Select(g => g.First()))
+            AddFilterButton(build.Tag, build.Tag, build.Name);
+
+        UpdateFilterButtonStates();
+    }
+
+    private void AddFilterButton(string label, string? buildTag, string tooltip)
+    {
+        var button = new ToggleButton
+        {
+            Content = label,
+            Tag = buildTag,
+            FontSize = 12,
+            Padding = new Thickness(10, 3),
+            Margin = new Thickness(0, 0, 6, 4)
+        };
+        ToolTip.SetTip(button, tooltip);
+        button.Click += (_, _) => OnBuildFilterClick(buildTag);
+        BuildFilterPanel.Children.Add(button);
+    }
+
+    private void OnBuildFilterClick(string? buildTag)
+    {
+        if (buildTag == null)
+        {
+            // "All": show every mod, keep the current target build
+            _activeBuildFilter = null;
+            UpdateFilterButtonStates();
+            RefreshModList();
+            return;
         }
 
-        if (notInstalled.Count > 0)
+        // A build button also makes that build the target, so installs and Play line up with the list.
+        // Selecting it fires OnVersionChanged, which applies the filter and refreshes the list.
+        var build = _manifest.Builds.FirstOrDefault(b => b.Tag == buildTag);
+        if (build != null && !ReferenceEquals(VersionComboBox.SelectedItem, build))
         {
-            comboItems.Add(new BuildGroupHeader("=== Available to Download ==="));
-            comboItems.AddRange(notInstalled);
-        }
-
-        var prevSelection = VersionComboBox.SelectedItem as BuildItem;
-        VersionComboBox.ItemsSource = comboItems;
-
-        if (prevSelection != null && comboItems.Contains(prevSelection))
-        {
-            VersionComboBox.SelectedItem = prevSelection;
+            VersionComboBox.SelectedItem = build;
         }
         else
         {
-            VersionComboBox.SelectedItem = comboItems.FirstOrDefault(x => x is BuildItem);
+            _activeBuildFilter = buildTag;
+            UpdateFilterButtonStates();
+            RefreshModList();
         }
     }
-    
-    private void OnResetConfigClick(object? sender, RoutedEventArgs e)
+
+    private void UpdateFilterButtonStates()
     {
-        ConfigManager.Delete();
-        _config = new AppConfig();
-        
-        BuildsPathTextBox.Text = string.Empty;
-        ModPathTextBox.Text = string.Empty;
-        AppdataPathTextBox.Text = string.Empty;
-        
-        Console.WriteLine("[INFO] config.json deleted and configuration reset.");
+        foreach (var button in BuildFilterPanel.Children.OfType<ToggleButton>())
+            button.IsChecked = (button.Tag as string) == _activeBuildFilter;
     }
+
+    private void RefreshModList()
+    {
+        if (_manifest?.Mods == null) return;
+
+        UpdateModStatuses(ConfigManager.Load());
+
+        // Build filter: that build's mods plus mods compatible with all builds
+        var filteredMods = _activeBuildFilter == null
+            ? _manifest.Mods.AsEnumerable()
+            : _manifest.Mods.Where(m => m.IsCompatibleWith(_activeBuildFilter));
+
+        // Interleave group headers with the mod items so the XAML DataTemplates render them cleanly
+        var groupedMods = new List<object>();
+        foreach (var group in filteredMods.GroupBy(m => m.Category))
+        {
+            groupedMods.Add(new BuildGroupHeader(group.Key));
+            groupedMods.AddRange(group);
+        }
+
+        ModListBox.ItemsSource = groupedMods;
+    }
+
+    private void OnVersionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // Prevent users from selecting the group header itself
+        if (VersionComboBox.SelectedItem is BuildGroupHeader)
+        {
+            if (e.RemovedItems.Count > 0)
+                VersionComboBox.SelectedItem = e.RemovedItems[0];
+            else if (_manifest?.Builds.Any() == true)
+                VersionComboBox.SelectedIndex = 1;
+            return;
+        }
+
+        // Selecting a build to play filters the list to mods compatible with it
+        if (VersionComboBox.SelectedItem is BuildItem build)
+            _activeBuildFilter = build.Tag;
+
+        UpdateFilterButtonStates();
+        RefreshModList();
+    }
+
+    // ───────────────────────── Wizard ─────────────────────────
+
+    private void UpdateWizardProgress(double progress, string status)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            WizardProgressBar.Value = progress;
+            WizardStatusText.Text = status;
+        });
+    }
+
+    private async void OnWizardStartClick(object sender, RoutedEventArgs e)
+    {
+        var config = ConfigManager.Load();
+        var selectedBuild = WizardBuildComboBox.SelectedItem as BuildItem;
+        if (selectedBuild == null) return;
+
+        bool isManual = ManualSetupRadio.IsChecked == true; 
+        bool setupControls = SetupControlsCheckBox.IsChecked == true; 
+
+        WizardProgressBar.IsVisible = true;
+        StartWizardButton.IsEnabled = false;
+
+        try
+        {
+            string buildDir = Path.Combine(config.BuildsDir, selectedBuild.Tag);
+            string buildModsDir = Path.Combine(buildDir, "mods"); 
+            Directory.CreateDirectory(buildModsDir);
+            Directory.CreateDirectory(ConfigManager.GetGeneralModsDir(config));
+
+            WizardStatusText.Text = $"Downloading {selectedBuild.Name}...";
+            await _downloadService.DownloadAndExtractAsync(selectedBuild.DownloadUrl, buildDir, UpdateWizardProgress);
+            
+            string dolPath = InstallerUtils.FindMainDol(buildDir);
+            
+            config.InstalledBuilds[selectedBuild.Tag] = new BuildPaths 
+            {
+                MainDolPath = dolPath,
+                ModDirPath = buildModsDir
+            };
+            selectedBuild.InstallStatus = "Installed";
+            ConfigManager.Save(config);
+
+            WizardStatusText.Text = "Downloading Dolphin Emulator...";
+            string dolphinUrl = DolphinManager.GetDolphinDownloadUrl(_manifest);
+            await _downloadService.DownloadAndExtractAsync(dolphinUrl, GlobalDolphinDir, UpdateWizardProgress);
+
+            // Point the appdata directory at the portable Dolphin's User/Load folder
+            string userLoadDir = DolphinManager.GetUserLoadDir(GlobalDolphinDir);
+            if (!string.IsNullOrEmpty(userLoadDir))
+            {
+                config.AppDataDir = userLoadDir;
+                ConfigManager.Save(config);
+                AppdataPathTextBox.Text = userLoadDir;
+            }
+
+            // Desktop shortcuts chosen in step 4
+            var shortcutNotes = new List<string>();
+            if (LauncherShortcutCheckBox.IsChecked == true)
+                shortcutNotes.Add(await CreateLauncherShortcutAsync());
+            if (BuildShortcutCheckBox.IsChecked == true)
+            {
+                string? gameNote = await CreateGameShortcutAsync(selectedBuild, dolPath, askFirst: false);
+                if (gameNote != null) shortcutNotes.Add(gameNote);
+            }
+
+            if (isManual || setupControls)
+            {
+                WizardStatusText.Text = isManual ? "Opening Dolphin for manual configuration..." : "Please configure your controls in Dolphin.";
+                DolphinManager.Launch(DolphinManager.GetSettingsCommand(GlobalDolphinDir), DebugCheckBox.IsChecked == true);
+            }
+
+            RefreshModList();
+            WizardStatusText.Text = shortcutNotes.Any()
+                ? $"Setup Complete! {string.Join(" ", shortcutNotes)}"
+                : "Setup Complete!";
+        }
+        catch (Exception ex)
+        {
+            WizardStatusText.Text = $"Setup failed: {ex.Message}";
+        }
+        finally
+        {
+            StartWizardButton.IsEnabled = true;
+        }
+    }
+
+    // ───────────────────────── Play ─────────────────────────
+
+    private void OnPlayButtonClick(object sender, RoutedEventArgs e)
+    {
+        var selectedBuild = VersionComboBox.SelectedItem as BuildItem; 
+        var config = ConfigManager.Load(); 
+        
+        if (selectedBuild != null && config.InstalledBuilds.TryGetValue(selectedBuild.Tag, out var paths))
+        {
+            // Re-resolve so builds installed before the DATA/UPDATE fix get corrected automatically
+            string resolvedDol = InstallerUtils.FindMainDol(Path.Combine(config.BuildsDir, selectedBuild.Tag));
+            if (!string.IsNullOrEmpty(resolvedDol) && resolvedDol != paths.MainDolPath)
+            {
+                paths.MainDolPath = resolvedDol;
+                ConfigManager.Save(config);
+            }
+
+            if (File.Exists(paths.MainDolPath))
+            {
+                try
+                {
+                    var playCommand = DolphinManager.GetPlayCommand(GlobalDolphinDir, paths.MainDolPath);
+
+                    // Launch with output drained so Dolphin can't block on a full stdout pipe.
+                    // Output is only forwarded to the debug console when Debug/Console Output is enabled.
+                    DolphinManager.Launch(playCommand, DebugCheckBox.IsChecked == true);
+                    StatusText.Text = $"Launching {selectedBuild.Name}...";
+                }
+                catch (Exception ex)
+                {
+                    StatusText.Text = $"Failed to launch Dolphin: {ex.Message}";
+                }
+            }
+            else
+            {
+                StatusText.Text = "main.dol not found for selected build.";
+            }
+        }
+        else
+        {
+            StatusText.Text = "Selected build is not installed yet.";
+        }
+    }
+
+    // ───────────────────────── Desktop shortcuts ─────────────────────────
+
+    /// <summary>
+    /// Creates a desktop shortcut that starts this build directly in Dolphin.
+    /// askFirst: show a Yes/No dialog first (Builds tab); the wizard uses its checkbox instead.
+    /// Returns a short note for the status line, or null if nothing was done or the user said no.
+    /// </summary>
+    private async Task<string?> CreateGameShortcutAsync(BuildItem build, string dolPath, bool askFirst)
+    {
+        if (string.IsNullOrEmpty(dolPath) || !File.Exists(dolPath))
+            return askFirst ? null : "Couldn't create the game shortcut: the build's main.dol wasn't found.";
+
+        var playCommand = DolphinManager.GetPlayCommand(GlobalDolphinDir, dolPath);
+        if (!File.Exists(playCommand.FileName))
+            return "Install Dolphin with the setup wizard to create a game shortcut.";
+
+        if (askFirst)
+        {
+            bool create = await ConfirmDialog.AskAsync(this,
+                "Desktop shortcut",
+                $"Create a desktop shortcut that starts {build.Name} directly in Dolphin?",
+                "Create shortcut", "No thanks");
+            if (!create) return null;
+        }
+
+        try
+        {
+            string path = await Task.Run(() => ShortcutService.CreateGameShortcut(build.Name, playCommand));
+            Console.WriteLine($"[OK] Created game shortcut: {path}");
+            return "Game shortcut added to your desktop.";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] Couldn't create the game shortcut: {ex.Message}");
+            return $"Couldn't create the game shortcut: {ex.Message}";
+        }
+    }
+
+    private async Task<string> CreateLauncherShortcutAsync()
+    {
+        try
+        {
+            string path = await Task.Run(() => ShortcutService.CreateLauncherShortcut());
+            Console.WriteLine($"[OK] Created launcher shortcut: {path}");
+            return "Launcher shortcut added to your desktop.";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] Couldn't create the launcher shortcut: {ex.Message}");
+            return $"Couldn't create the launcher shortcut: {ex.Message}";
+        }
+    }
+
+    // ───────────────────────── Installs ─────────────────────────
+
+    private async void OnInstallButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (sender == InstallButton) await InstallSelectedModsAsync();
+        else if (sender == Install_Build_Button) await InstallSelectedBuildAsync();
+        else if (sender == InstallToolButton) await InstallSelectedToolAsync();
+    }
+
+    /// <summary>
+    /// Installs the selected mods into the target build using ModInstaller:
+    /// game files go into that build's own game folder, textures into Dolphin's appdata Load folder.
+    /// Downloads are kept in the general Mods folder (all-build mods) or Builds/&lt;tag&gt;/mods.
+    /// </summary>
+    private async Task InstallSelectedModsAsync()
+    {
+        var config = ConfigManager.Load();
+
+        var selectedMods = ModListBox.SelectedItems?.Cast<object>().OfType<ModItem>().ToList();
+        if (selectedMods == null || !selectedMods.Any())
+        {
+            StatusText.Text = "No mods selected for installation.";
+            return;
+        }
+
+        var targetBuild = VersionComboBox.SelectedItem as BuildItem;
+        BuildPaths? targetPaths = null;
+        if (targetBuild != null)
+            config.InstalledBuilds.TryGetValue(targetBuild.Tag, out targetPaths);
+
+        // Build-specific mods need a compatible, installed target build
+        var skipped = new List<string>();
+        var toInstall = new List<ModItem>();
+        foreach (var mod in selectedMods)
+        {
+            if (!mod.IsUniversal)
+            {
+                if (targetBuild == null || !mod.IsCompatibleWith(targetBuild.Tag))
+                {
+                    skipped.Add($"{mod.Name} (needs {mod.CompatibilityLabel})");
+                    continue;
+                }
+                if (targetPaths == null)
+                {
+                    skipped.Add($"{mod.Name} (install {targetBuild.Tag} first)");
+                    continue;
+                }
+            }
+            toInstall.Add(mod);
+        }
+
+        if (!toInstall.Any())
+        {
+            StatusText.Text = $"Nothing to install. Skipped: {string.Join("; ", skipped)}";
+            return;
+        }
+
+        // Texture mods go to Dolphin's User/Load folder; fill it in if the wizard hasn't yet
+        if (string.IsNullOrWhiteSpace(config.AppDataDir) && Directory.Exists(GlobalDolphinDir))
+        {
+            config.AppDataDir = DolphinManager.GetUserLoadDir(GlobalDolphinDir);
+            ConfigManager.Save(config);
+            AppdataPathTextBox.Text = config.AppDataDir;
+        }
+
+        string? installedTag = targetPaths != null ? targetBuild?.Tag : null;
+        var request = new ModInstallRequest
+        {
+            Mods = toInstall,
+            TargetBuildTag = installedTag,
+            BuildDir = installedTag != null ? Path.Combine(config.BuildsDir, installedTag) : null,
+            BuildModsDir = targetPaths?.ModDirPath,
+            GeneralModsDir = ConfigManager.GetGeneralModsDir(config),
+            AppDataLoadDir = config.AppDataDir,
+            ToolsDir = GlobalToolsDir,
+            Manifest = _manifest,
+            Config = config
+        };
+
+        var installer = new ModInstaller(_downloadService, (percent, message) =>
+            Dispatcher.UIThread.Post(() =>
+            {
+                InstallProgressBar.Value = percent;
+                StatusText.Text = message;
+            }));
+
+        InstallButton.IsEnabled = false;
+        PlayButton.IsEnabled = false;
+        try
+        {
+            var result = await installer.InstallAsync(request);
+
+            foreach (var mod in result.Installed)
+            {
+                string id = ItemKey(mod.Id, mod.Name);
+                string key = result.BuildScoped.Contains(mod) && installedTag != null ? $"{installedTag}/{id}" : id;
+                config.InstalledVersions[key] = mod.Version;
+            }
+            ConfigManager.Save(config);
+            UpdateInstallationStatuses(); // also refreshes tools the installer downloaded
+
+            string summary = result.Success
+                ? $"Installed {result.Installed.Count} mod(s)."
+                : $"Finished with {result.Errors.Count} error(s): {result.Errors[0]}";
+            if (result.Warnings.Any()) summary += $" {result.Warnings.Count} warning(s).";
+            if (skipped.Any()) summary += $" Skipped: {string.Join("; ", skipped)}.";
+            if (!result.Success || result.Warnings.Any()) summary += " See Debug/Console Output for details.";
+
+            // Posted so it lands after any queued progress updates
+            Dispatcher.UIThread.Post(() => StatusText.Text = summary);
+        }
+        catch (Exception ex)
+        {
+            Dispatcher.UIThread.Post(() => StatusText.Text = $"Mod installation failed: {ex.Message}");
+        }
+        finally
+        {
+            InstallButton.IsEnabled = true;
+            PlayButton.IsEnabled = true;
+        }
+    }
+
+    private async Task InstallSelectedBuildAsync()
+    {
+        var config = ConfigManager.Load();
+        var selectedBuild = Wii_Builds.SelectedItem as BuildItem;
+        if (selectedBuild == null) return;
+
+        Install_Build_Button.IsEnabled = false;
+        try
+        {
+            string buildDir = Path.Combine(config.BuildsDir, selectedBuild.Tag);
+            string buildModsDir = Path.Combine(buildDir, "mods");
+            Directory.CreateDirectory(buildModsDir);
+            Directory.CreateDirectory(ConfigManager.GetGeneralModsDir(config));
+
+            BuildsStatusText.Text = $"Installing {selectedBuild.Name}...";
+            await _downloadService.DownloadAndExtractAsync(selectedBuild.DownloadUrl, buildDir, (val, msg) =>
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    BuildsProgressBar.Value = val;
+                    BuildsStatusText.Text = msg;
+                });
+            });
+
+            string dolPath = InstallerUtils.FindMainDol(buildDir);
+            config.InstalledBuilds[selectedBuild.Tag] = new BuildPaths
+            {
+                MainDolPath = dolPath,
+                ModDirPath = buildModsDir
+            };
+
+            selectedBuild.InstallStatus = "Installed";
+            ConfigManager.Save(config);
+            RefreshModList();
+            BuildsStatusText.Text = "Build installed successfully!";
+
+            string? shortcutNote = await CreateGameShortcutAsync(selectedBuild, dolPath, askFirst: true);
+            if (shortcutNote != null)
+                BuildsStatusText.Text = $"Build installed successfully! {shortcutNote}";
+        }
+        catch (Exception ex)
+        {
+            BuildsStatusText.Text = $"Build installation failed: {ex.Message}";
+        }
+        finally
+        {
+            Install_Build_Button.IsEnabled = true;
+        }
+    }
+
+    /// <summary>
+    /// Tools are installed to Tools/<ToolName> in the same directory as the program.
+    /// </summary>
+    private async Task InstallSelectedToolAsync()
+    {
+        var config = ConfigManager.Load();
+        var selectedTool = ToolListBox.SelectedItem as ToolItem;
+        if (selectedTool == null) return;
+
+        InstallToolButton.IsEnabled = false;
+        try
+        {
+            string toolDir = Path.Combine(GlobalToolsDir, selectedTool.Name);
+
+            ToolStatusText.Text = $"Installing {selectedTool.Name}...";
+            await _downloadService.DownloadAndExtractAsync(selectedTool.DownloadUrl, toolDir, (val, msg) =>
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    ToolProgressBar.Value = val;
+                    ToolStatusText.Text = msg;
+                });
+            });
+
+            selectedTool.InstallStatus = "Installed";
+            config.InstalledVersions[ItemKey(selectedTool.Id, selectedTool.Name)] = selectedTool.Version;
+            ConfigManager.Save(config);
+
+            ToolStatusText.Text = $"Tool installed to {toolDir}";
+        }
+        catch (Exception ex)
+        {
+            ToolStatusText.Text = $"Tool installation failed: {ex.Message}";
+        }
+        finally
+        {
+            InstallToolButton.IsEnabled = true;
+        }
+    }
+
+    // ───────────────────────── Settings ─────────────────────────
+
+    private void OnBrowseBuildsPathClick(object sender, RoutedEventArgs e) { }
+    private void OnBrowseModPathClick(object sender, RoutedEventArgs e) { }
+    private void OnBrowseAppdataPathClick(object sender, RoutedEventArgs e) { }
+    private void OnResetConfigClick(object sender, RoutedEventArgs e) { }
 }

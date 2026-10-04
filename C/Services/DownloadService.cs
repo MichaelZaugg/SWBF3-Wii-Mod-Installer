@@ -1,4 +1,3 @@
-// Services/DownloadService.cs
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -18,6 +17,9 @@ public class DownloadService
 
     public async Task DownloadAndExtractAsync(string url, string targetDir, Action<double, string> onProgress)
     {
+        // Ensure destination directory exists prior to archive extraction
+        Directory.CreateDirectory(targetDir);
+
         string tempFile = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.tmp");
 
         try
