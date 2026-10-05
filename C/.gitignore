@@ -1,0 +1,17 @@
+# Build outputs and intermediate files
+bin/
+obj/
+r911-M/
+Dolphin/
+
+# IDE & Editor settings (VS Code / Visual Studio)
+.vscode/
+.idea/
+*.user
+*.suo
+
+# System generated files
+.DS_Store
+Thumbs.db
+compile_commands.txt
+Notes.txt
