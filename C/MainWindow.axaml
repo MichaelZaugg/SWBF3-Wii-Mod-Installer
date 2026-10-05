@@ -134,10 +134,10 @@
                             <TextBlock x:Name="StatusText" Text="Ready" FontSize="12" Foreground="#A0A0A0" TextWrapping="Wrap"/>
                         </StackPanel>
 
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Stretch" Spacing="8">
-                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
+                        <Grid ColumnDefinitions="Auto, *, Auto">
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
                                 <TextBlock Text="Target Build:" VerticalAlignment="Center" Foreground="#A0A0A0"/>
-                                <ComboBox x:Name="VersionComboBox" Width="260" VerticalAlignment="Center" SelectionChanged="OnVersionChanged">
+                                <ComboBox x:Name="VersionComboBox" Width="220" VerticalAlignment="Center" SelectionChanged="OnVersionChanged">
                                     <ComboBox.DataTemplates>
                                         <DataTemplate DataType="vm:BuildGroupHeader">
                                             <TextBlock Text="{Binding Title}" 
@@ -155,13 +155,15 @@
                                 </ComboBox>
                             </StackPanel>
 
-                            <Panel HorizontalAlignment="Stretch" x:Name="Spacer" />
-
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="5">
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5">
+                                <Button x:Name="RestoreControlsButton" Content="Restore Controls" Padding="12,8" Click="OnRestoreControlsClick"
+                                        ToolTip.Tip="Puts Dolphin's Wii Remote 1 controls, Connect USB Keyboard and Reset hotkey back to how they were before KBM Controls was installed."/>
                                 <Button x:Name="InstallButton" Content="Install Mod(s)" Background="White" Foreground="Black" Padding="16,8" Click="OnInstallButtonClick"/>
                                 <Button x:Name="PlayButton" Content="Play" Background="Red" Foreground="White" Padding="16,8" Click="OnPlayButtonClick"/>
+                                <Button x:Name="OpenDolphinButton" Content="Open Dolphin" Padding="12,8" Click="OnOpenDolphinClick"
+                                        ToolTip.Tip="Opens Dolphin without starting a game, e.g. to change its settings or controls."/>
                             </StackPanel>
-                        </StackPanel>
+                        </Grid>
                     </StackPanel>
                 </Grid>
             </TabItem>
@@ -206,9 +208,22 @@
                             <ProgressBar x:Name="ToolProgressBar" Height="12" Value="0" Maximum="100"/>
                             <TextBlock x:Name="ToolStatusText" Text="Ready" FontSize="12" Foreground="#A0A0A0"/>
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="5">
-                            <Button x:Name="InstallToolButton" Content="Install Tool" Background="White" Foreground="Black" Padding="16,8" Click="OnInstallButtonClick"/>
-                        </StackPanel>
+                        <Grid ColumnDefinitions="Auto, *, Auto">
+                            <!-- Repair: restores a build's stock files from the r911 Repair Files -->
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="Repair build:" VerticalAlignment="Center" Foreground="#A0A0A0"/>
+                                <ComboBox x:Name="RepairBuildComboBox" Width="220" VerticalAlignment="Center">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate DataType="vm:BuildItem">
+                                            <TextBlock Text="{Binding Name}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <Button x:Name="RepairButton" Content="Repair" Background="#8B0000" Foreground="White" Padding="16,8" Click="OnRepairClick"
+                                        ToolTip.Tip="Restores the build's stock files (data, embed_wi_v4 and main.dol) from the r911 Repair Files, overwriting all mod changes."/>
+                            </StackPanel>
+                            <Button Grid.Column="2" x:Name="InstallToolButton" Content="Install Tool" Background="White" Foreground="Black" Padding="16,8" Click="OnInstallButtonClick"/>
+                        </Grid>
                     </StackPanel>
                 </Grid>
             </TabItem>
@@ -263,7 +278,7 @@
             <TabItem Header="Settings">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="10,15,10,10" Spacing="15" MaxWidth="500" HorizontalAlignment="Left">
-                        <TextBlock Text="Version: 8.0" FontSize="16"/>
+                        <TextBlock x:Name="VersionText" Text="Version: 8.0" FontSize="16"/>
                         <TextBlock Text="Directories &amp; Paths" FontSize="16" FontWeight="SemiBold"/>
                         
                         <StackPanel Spacing="5">
@@ -293,11 +308,16 @@
                         <Separator Background="#333333" Margin="0,5"/>
 
                         <TextBlock Text="Updates &amp; Integration" FontSize="16" FontWeight="SemiBold"/>
-                        <CheckBox Content="Automatically check for updates on launch" IsChecked="True"/>
+                        <CheckBox x:Name="AutoUpdateCheckBox" Content="Automatically check for updates on launch" IsChecked="True"
+                                  IsCheckedChanged="OnAutoUpdateCheckChanged"/>
                         <CheckBox Content="Keep temporary download zip files after installation"/>
                         <CheckBox x:Name="DebugCheckBox" Content="Debug/Console Output" IsChecked="False"/>
 
-                        <Button x:Name="UpdateButton" Content="Check for Updates" Padding="16,8" Click="OnInstallButtonClick"/>
+                        <StackPanel Spacing="4">
+                            <Button x:Name="UpdateButton" Content="Check for Updates" Padding="16,8" Click="OnCheckForUpdatesClick"/>
+                            <ProgressBar x:Name="UpdateProgressBar" Height="8" Maximum="100" IsVisible="False"/>
+                            <TextBlock x:Name="UpdateStatusText" FontSize="12" Foreground="#A0A0A0" TextWrapping="Wrap"/>
+                        </StackPanel>
                         <Button x:Name="ResetConfigButton" Content="Reset Config" Padding="16,8" Click="OnResetConfigClick" Background="#8B0000" Foreground="White" Margin="0,10,0,0"/>
                     </StackPanel>
                 </ScrollViewer>

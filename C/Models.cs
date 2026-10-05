@@ -42,6 +42,7 @@ public class AppConfig
     public string ModDir { get; set; } = "";
     public string AppDataDir { get; set; } = "";
     public bool LoadCustomTextures { get; set; } = true;
+    public bool CheckForUpdatesOnLaunch { get; set; } = true;
     
     public Dictionary<string, BuildPaths> InstalledBuilds { get; set; } = new(); 
 

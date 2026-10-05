@@ -24,6 +24,8 @@ public partial class MainWindow : Window
     private static readonly string GlobalDolphinDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Dolphin");
     private static readonly string GlobalToolsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools");
 
+    private const string ManifestUrl = "https://starwars.thinggoeserror.net/manifest.json";
+
     // Active build filter on the Play/Mods tab. null = show every mod.
     private string? _activeBuildFilter;
 
@@ -48,6 +50,13 @@ public partial class MainWindow : Window
         BuildsPathTextBox.Text = startupConfig.BuildsDir;
         ModPathTextBox.Text = startupConfig.ModDir;
         AppdataPathTextBox.Text = startupConfig.AppDataDir;
+
+        // Updates: delete what an update left behind, show this version, restore the auto-check setting
+        UpdateService.CleanUpAfterUpdate();
+        VersionText.Text = $"Version: {UpdateService.CurrentVersion}";
+        AutoUpdateCheckBox.IsChecked = startupConfig.CheckForUpdatesOnLaunch;
+        if (UpdateService.JustUpdated)
+            UpdateStatusText.Text = $"Updated to version {UpdateService.CurrentVersion}.";
         
         // Load manifest from server and populate UI
         _ = InitializeAppAsync();
@@ -103,6 +112,23 @@ public partial class MainWindow : Window
                 ? "Installed"
                 : "Not Installed";
         }
+
+        RefreshRepairBuilds(config);
+    }
+
+    /// <summary>Fills the Tools tab's "Repair build" list with installed builds the repair files are made for.</summary>
+    private void RefreshRepairBuilds(AppConfig? config = null)
+    {
+        config ??= ConfigManager.Load();
+
+        var builds = _manifest.Builds
+            .Where(b => config.InstalledBuilds.ContainsKey(b.Tag) && ModInstaller.RepairFilesApplyTo(_manifest, b.Tag))
+            .ToList();
+
+        var previous = RepairBuildComboBox.SelectedItem as BuildItem;
+        RepairBuildComboBox.ItemsSource = builds;
+        RepairBuildComboBox.SelectedItem = previous != null && builds.Contains(previous) ? previous : builds.FirstOrDefault();
+        RepairButton.IsEnabled = builds.Any();
     }
 
     /// <summary>
@@ -145,9 +171,7 @@ public partial class MainWindow : Window
 
             // Fetch manifest from the server
             using var client = new HttpClient();
-            string manifestUrl = "http://192.168.0.100:8881/manifest.json";
-            
-            string json = await client.GetStringAsync(manifestUrl);
+            string json = await client.GetStringAsync(ManifestUrl);
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             _manifest = JsonSerializer.Deserialize<AppManifest>(json, options) ?? new AppManifest();
 
@@ -201,7 +225,10 @@ public partial class MainWindow : Window
                 };
 
                 RefreshModList();
-                StatusText.Text = "Ready";
+                StatusText.Text = UpdateService.JustUpdated ? $"Updated to version {UpdateService.CurrentVersion}. Ready" : "Ready";
+
+                if (AutoUpdateCheckBox.IsChecked == true)
+                    _ = CheckForUpdatesAsync(userRequested: false);
             });
         }
         catch (HttpRequestException ex)
@@ -358,6 +385,7 @@ public partial class MainWindow : Window
             };
             selectedBuild.InstallStatus = "Installed";
             ConfigManager.Save(config);
+            RefreshRepairBuilds(config);
 
             WizardStatusText.Text = "Downloading Dolphin Emulator...";
             string dolphinUrl = DolphinManager.GetDolphinDownloadUrl(_manifest);
@@ -566,15 +594,26 @@ public partial class MainWindow : Window
         }
 
         string? installedTag = targetPaths != null ? targetBuild?.Tag : null;
+
+        // Mods that already changed this build's game files (reinstalled if the build has to be recompiled)
+        var installedGameMods = installedTag == null
+            ? new List<ModItem>()
+            : _manifest.Mods
+                .Where(m => config.InstalledVersions.ContainsKey($"{installedTag}/{ItemKey(m.Id, m.Name)}")
+                            && (ModInstaller.GetRecipe(m)?.TouchesGame ?? true))
+                .ToList();
+
         var request = new ModInstallRequest
         {
             Mods = toInstall,
+            InstalledGameMods = installedGameMods,
             TargetBuildTag = installedTag,
             BuildDir = installedTag != null ? Path.Combine(config.BuildsDir, installedTag) : null,
             BuildModsDir = targetPaths?.ModDirPath,
             GeneralModsDir = ConfigManager.GetGeneralModsDir(config),
             AppDataLoadDir = config.AppDataDir,
             ToolsDir = GlobalToolsDir,
+            DolphinDir = GlobalDolphinDir,
             Manifest = _manifest,
             Config = config
         };
@@ -594,8 +633,11 @@ public partial class MainWindow : Window
 
             foreach (var mod in result.Installed)
             {
+                // Recorded per build when the mod is for specific builds (how the mod list looks it up)
+                // or when it changed this build's game files; otherwise once for all builds.
                 string id = ItemKey(mod.Id, mod.Name);
-                string key = result.BuildScoped.Contains(mod) && installedTag != null ? $"{installedTag}/{id}" : id;
+                bool perBuild = !mod.IsUniversal || result.BuildScoped.Contains(mod);
+                string key = perBuild && installedTag != null ? $"{installedTag}/{id}" : id;
                 config.InstalledVersions[key] = mod.Version;
             }
             ConfigManager.Save(config);
@@ -656,6 +698,7 @@ public partial class MainWindow : Window
             selectedBuild.InstallStatus = "Installed";
             ConfigManager.Save(config);
             RefreshModList();
+            RefreshRepairBuilds(config);
             BuildsStatusText.Text = "Build installed successfully!";
 
             string? shortcutNote = await CreateGameShortcutAsync(selectedBuild, dolPath, askFirst: true);
@@ -712,10 +755,298 @@ public partial class MainWindow : Window
         }
     }
 
+    // ───────────────────────── Restore Dolphin controls ─────────────────────────
+
+    /// <summary>
+    /// Play/Mods → Restore Controls: puts back the Dolphin control settings KBM Controls changed,
+    /// from the backups made when it was installed.
+    /// </summary>
+    private async void OnRestoreControlsClick(object sender, RoutedEventArgs e)
+    {
+        var config = ConfigManager.Load();
+        if (string.IsNullOrWhiteSpace(config.AppDataDir))
+        {
+            StatusText.Text = "Dolphin's appdata folder isn't set, so there's nothing to restore. Run the setup wizard first.";
+            return;
+        }
+
+        bool confirmed = await ConfirmDialog.AskAsync(this,
+            "Restore Dolphin controls",
+            "Put Dolphin's controls back to how they were before KBM Controls was installed?\n\n" +
+            "This restores Wii Remote 1's mappings, the Connect USB Keyboard setting and the Reset hotkey. " +
+            "Esc stays set to stop the game. " +
+            "Close Dolphin first, or it may save over the change when it exits.",
+            "Restore", "Cancel");
+        if (!confirmed) return;
+
+        RestoreControlsButton.IsEnabled = false;
+        try
+        {
+            var restored = await Task.Run(() => ModInstaller.RestoreDolphinControls(config.AppDataDir));
+            StatusText.Text = (restored.Any()
+                ? $"Restored Dolphin's original {string.Join(", ", restored)}."
+                : "No backups of Dolphin's control settings were found (KBM Controls makes them when it's installed).")
+                + " Esc is set to stop the game.";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Couldn't restore Dolphin's controls: {ex.Message}";
+        }
+        finally
+        {
+            RestoreControlsButton.IsEnabled = true;
+        }
+    }
+
+    // ───────────────────────── Repair ─────────────────────────
+
+    /// <summary>
+    /// Tools tab → Repair: restores the selected build's stock files from the r911 Repair Files
+    /// (data, embed_wi_v4, main.dol), overwriting every mod's changes to them.
+    /// </summary>
+    private async void OnRepairClick(object sender, RoutedEventArgs e)
+    {
+        if (RepairBuildComboBox.SelectedItem is not BuildItem build) return;
+
+        var config = ConfigManager.Load();
+        if (!config.InstalledBuilds.TryGetValue(build.Tag, out var paths))
+        {
+            ToolStatusText.Text = $"{build.Name} isn't installed.";
+            return;
+        }
+
+        bool confirmed = await ConfirmDialog.AskAsync(this,
+            "Repair build",
+            $"Restore the stock files of {build.Name}?\n\n" +
+            "This overwrites the build's data folder, embed_wi_v4 and main.dol with the r911 Repair Files, " +
+            "undoing every installed mod's changes to the game files. Texture mods in Dolphin aren't affected.",
+            "Repair", "Cancel");
+        if (!confirmed) return;
+
+        var installer = new ModInstaller(_downloadService, (percent, message) =>
+            Dispatcher.UIThread.Post(() =>
+            {
+                ToolProgressBar.Value = percent;
+                ToolStatusText.Text = message;
+            }));
+
+        var request = new ModInstallRequest
+        {
+            TargetBuildTag = build.Tag,
+            BuildDir = Path.Combine(config.BuildsDir, build.Tag),
+            BuildModsDir = paths.ModDirPath,
+            GeneralModsDir = ConfigManager.GetGeneralModsDir(config),
+            AppDataLoadDir = config.AppDataDir,
+            ToolsDir = GlobalToolsDir,
+            DolphinDir = GlobalDolphinDir,
+            Manifest = _manifest,
+            Config = config
+        };
+
+        RepairButton.IsEnabled = false;
+        InstallToolButton.IsEnabled = false;
+        try
+        {
+            var result = await installer.RepairGameAsync(request);
+
+            string summary;
+            if (result.Success)
+            {
+                // The build's game-file mods were overwritten, so they're no longer installed.
+                // Texture-only mods (e.g. Custom Skyboxes) live in Dolphin's folder and stay installed.
+                string prefix = build.Tag + "/";
+                var removed = config.InstalledVersions.Keys
+                    .Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    .Where(k =>
+                    {
+                        string id = k[prefix.Length..];
+                        var mod = _manifest.Mods.FirstOrDefault(m => string.Equals(ItemKey(m.Id, m.Name), id, StringComparison.OrdinalIgnoreCase));
+                        var recipe = mod == null ? null : ModInstaller.GetRecipe(mod);
+                        bool textureOnly = recipe != null && !recipe.TouchesGame;
+                        return !textureOnly;
+                    })
+                    .ToList();
+                foreach (string key in removed)
+                    config.InstalledVersions.Remove(key);
+                ConfigManager.Save(config);
+
+                summary = removed.Any()
+                    ? $"Repaired {build.Name}. {removed.Count} mod(s) are now marked as not installed for it."
+                    : $"Repaired {build.Name}.";
+                Console.WriteLine($"[OK] {summary}");
+            }
+            else
+            {
+                summary = $"Repair failed: {result.Errors[0]} See Debug/Console Output for details.";
+            }
+
+            UpdateInstallationStatuses(); // also refreshes the mod list's statuses and the tool list
+            RefreshModList();
+
+            // Posted so it lands after any queued progress updates
+            Dispatcher.UIThread.Post(() => ToolStatusText.Text = summary);
+        }
+        catch (Exception ex)
+        {
+            Dispatcher.UIThread.Post(() => ToolStatusText.Text = $"Repair failed: {ex.Message}");
+        }
+        finally
+        {
+            InstallToolButton.IsEnabled = true;
+            RefreshRepairBuilds();
+        }
+    }
+
     // ───────────────────────── Settings ─────────────────────────
 
     private void OnBrowseBuildsPathClick(object sender, RoutedEventArgs e) { }
     private void OnBrowseModPathClick(object sender, RoutedEventArgs e) { }
     private void OnBrowseAppdataPathClick(object sender, RoutedEventArgs e) { }
     private void OnResetConfigClick(object sender, RoutedEventArgs e) { }
+
+    // ───────────────────────── Open Dolphin ─────────────────────────
+
+    /// <summary>Opens Dolphin on its own (no game), e.g. to change graphics settings or controls.</summary>
+    private void OnOpenDolphinClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var command = DolphinManager.GetSettingsCommand(GlobalDolphinDir);
+            if (!File.Exists(command.FileName))
+            {
+                StatusText.Text = "Dolphin isn't installed yet. Run the setup in the Install SWBF3 tab first.";
+                return;
+            }
+
+            DolphinManager.Launch(command, DebugCheckBox.IsChecked == true);
+            StatusText.Text = "Opening Dolphin...";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Failed to open Dolphin: {ex.Message}";
+        }
+    }
+
+    // ───────────────────────── Manager updates ─────────────────────────
+
+    private void OnAutoUpdateCheckChanged(object? sender, RoutedEventArgs e)
+    {
+        var config = ConfigManager.Load();
+        bool enabled = AutoUpdateCheckBox.IsChecked == true;
+        if (config.CheckForUpdatesOnLaunch == enabled) return;
+        config.CheckForUpdatesOnLaunch = enabled;
+        ConfigManager.Save(config);
+    }
+
+    private async void OnCheckForUpdatesClick(object sender, RoutedEventArgs e) =>
+        await CheckForUpdatesAsync(userRequested: true);
+
+    /// <summary>
+    /// Compares this version with the manifest's "installer" entry and offers the update.
+    /// On launch (<paramref name="userRequested"/> false) it stays quiet unless there is an update.
+    /// </summary>
+    private async Task CheckForUpdatesAsync(bool userRequested)
+    {
+        if (!UpdateButton.IsEnabled) return;
+        UpdateButton.IsEnabled = false;
+
+        try
+        {
+            if (userRequested)
+            {
+                UpdateStatusText.Text = "Checking for updates...";
+                await RefreshManifestAsync();
+            }
+
+            UpdateInfo? update;
+            try
+            {
+                update = UpdateService.CheckForUpdate(_manifest);
+            }
+            catch (Exception ex)
+            {
+                UpdateStatusText.Text = ex.Message;
+                return;
+            }
+
+            if (update == null)
+            {
+                if (userRequested)
+                    UpdateStatusText.Text = $"You have the latest version ({UpdateService.CurrentVersion}).";
+                return;
+            }
+
+            UpdateStatusText.Text = $"Version {update.LatestVersion} is available (you have {UpdateService.CurrentVersion}).";
+
+            if (IsBusy())
+            {
+                UpdateStatusText.Text += " Finish the current install, then click Check for Updates.";
+                return;
+            }
+
+            bool install = await ConfirmDialog.AskAsync(this, "Update available",
+                $"Version {update.LatestVersion} of {ShortcutService.LauncherName} is available (you have {UpdateService.CurrentVersion}).\n\n" +
+                "Download it now? The manager will restart. Your builds, mods and settings are kept.",
+                "Update", "Later");
+            if (!install) return;
+
+            await InstallUpdateAsync(update);
+        }
+        finally
+        {
+            UpdateButton.IsEnabled = true;
+        }
+    }
+
+    private async Task InstallUpdateAsync(UpdateInfo update)
+    {
+        UpdateProgressBar.IsVisible = true;
+        UpdateProgressBar.Value = 0;
+
+        try
+        {
+            await Task.Run(() => UpdateService.DownloadAndApplyAsync(update, (percent, message) =>
+                Dispatcher.UIThread.Post(() =>
+                {
+                    UpdateProgressBar.Value = percent;
+                    UpdateStatusText.Text = message;
+                    StatusText.Text = message;
+                })));
+
+            // The new version has started; close this one so its file can be deleted
+            await Task.Delay(500);
+            if (Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+                desktop.Shutdown();
+            else
+                Environment.Exit(0);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[ERROR] Update failed: {ex}");
+            UpdateStatusText.Text = $"Update failed: {ex.Message}";
+            UpdateProgressBar.IsVisible = false;
+        }
+    }
+
+    /// <summary>Downloads the manifest again so a manual check sees a version published since launch.</summary>
+    private async Task RefreshManifestAsync()
+    {
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            string json = await client.GetStringAsync(ManifestUrl);
+            var fresh = JsonSerializer.Deserialize<AppManifest>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (fresh != null) _manifest.Installer = fresh.Installer;
+            if (!string.IsNullOrWhiteSpace(fresh?.BaseUrl)) _manifest.BaseUrl = fresh.BaseUrl;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[WARN] Couldn't refresh the manifest ({ex.Message}); using the one from launch.");
+        }
+    }
+
+    /// <summary>True while something is being installed (those buttons are disabled for the duration).</summary>
+    private bool IsBusy() =>
+        !InstallButton.IsEnabled || !Install_Build_Button.IsEnabled || !InstallToolButton.IsEnabled
+        || !RestoreControlsButton.IsEnabled || !StartWizardButton.IsEnabled;
 }
